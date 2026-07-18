@@ -13,7 +13,11 @@ test('admin commerce feature bundles are physically absent', () => {
     'frontend-admin/src/pages/Orders.tsx',
     'frontend-admin/src/components/admin/DashboardCharts.tsx',
   ]) {
-    assert.equal(existsSync(resolve(root, file)), false, `${file} must not ship in the admin bundle`);
+    assert.equal(
+      existsSync(resolve(root, file)),
+      false,
+      `${file} must not ship in the admin bundle`,
+    );
   }
 });
 
@@ -22,7 +26,16 @@ test('admin navigation contains service operations only', () => {
   const permissions = read('frontend-admin/src/config/adminPermissions.ts');
   const router = read('frontend-admin/src/router/AppRouter.tsx');
 
-  for (const required of ['operations', 'service-requests', 'technicians', 'customers', 'notifications', 'content', 'settings', 'audit']) {
+  for (const required of [
+    'operations',
+    'service-requests',
+    'technicians',
+    'customers',
+    'notifications',
+    'content',
+    'settings',
+    'audit',
+  ]) {
     assert.match(navigation, new RegExp(required));
   }
   assert.doesNotMatch(navigation, /\/products|\/orders|Sản phẩm|Đơn hàng|Tồn kho/);
@@ -36,7 +49,10 @@ test('mock sessions expose service-only role navigation permissions', () => {
   assert.match(auth, /notifications\.view/);
   assert.match(auth, /audit\.view/);
 
-  const uiPermissionBlock = auth.slice(auth.indexOf('const UI_ROLE_PERMISSIONS'), auth.indexOf('const getUiPermissions'));
+  const uiPermissionBlock = auth.slice(
+    auth.indexOf('const UI_ROLE_PERMISSIONS'),
+    auth.indexOf('const getUiPermissions'),
+  );
   assert.doesNotMatch(uiPermissionBlock, /products\.|orders\.|design-system\./);
 });
 

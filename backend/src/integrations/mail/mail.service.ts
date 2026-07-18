@@ -19,14 +19,6 @@ export class MailService {
     return this.deliver(to, subject, text, html);
   }
 
-  async sendOrderConfirmation(email: string, order: { orderNumber: string }) {
-    return this.deliver(
-      email,
-      `Xác nhận đơn hàng ${order.orderNumber}`,
-      `Điện Lạnh 247 đã tiếp nhận đơn hàng ${order.orderNumber}.`,
-    );
-  }
-
   async sendServiceRequestConfirmation(
     email: string,
     request: {

@@ -8,6 +8,9 @@ export interface DatabaseCheck {
 
 export interface LivenessResponse {
   status: 'ok';
+  mode: 'service-only';
+  contractVersion: 'service-only-v1';
+  capabilities: ServiceCapabilities;
   service: string;
   version: string;
   environment: string;
@@ -21,11 +24,30 @@ export interface LivenessResponse {
 
 export interface ReadinessResponse {
   status: 'ok';
+  mode: 'service-only';
+  contractVersion: 'service-only-v1';
+  capabilities: ServiceCapabilities;
   service: string;
   version: string;
   timestamp: string;
   checks: { database: DatabaseCheck };
 }
+
+interface ServiceCapabilities {
+  serviceRequests: true;
+  quotations: true;
+  servicePayments: true;
+  warranty: true;
+  commerce: false;
+}
+
+const SERVICE_CAPABILITIES: ServiceCapabilities = {
+  serviceRequests: true,
+  quotations: true,
+  servicePayments: true,
+  warranty: true,
+  commerce: false,
+};
 
 @Injectable()
 export class HealthService {
@@ -35,6 +57,9 @@ export class HealthService {
     const memory = process.memoryUsage();
     return {
       status: 'ok',
+      mode: 'service-only',
+      contractVersion: 'service-only-v1',
+      capabilities: SERVICE_CAPABILITIES,
       service: 'dien-lanh-247-api',
       version: process.env.APP_VERSION || 'development',
       environment: process.env.NODE_ENV || 'development',
@@ -64,6 +89,9 @@ export class HealthService {
         message: 'Service is not ready',
         data: {
           status: 'error',
+          mode: 'service-only',
+          contractVersion: 'service-only-v1',
+          capabilities: SERVICE_CAPABILITIES,
           service: 'dien-lanh-247-api',
           timestamp: new Date().toISOString(),
           checks: { database },
@@ -73,6 +101,9 @@ export class HealthService {
 
     return {
       status: 'ok',
+      mode: 'service-only',
+      contractVersion: 'service-only-v1',
+      capabilities: SERVICE_CAPABILITIES,
       service: 'dien-lanh-247-api',
       version: process.env.APP_VERSION || 'development',
       timestamp: new Date().toISOString(),

@@ -131,8 +131,7 @@ try {
   assert.equal(registerOwner.status, 201);
   assert.ok(ownerJar.get('accessToken'));
   assert.ok(ownerJar.get('refreshToken'));
-  const ownerId = registerOwner.json?.data?.user?.id;
-  assert.ok(Number.isInteger(ownerId));
+  assert.ok(Number.isInteger(registerOwner.json?.data?.user?.id));
   assert.equal(registerOwner.json?.data?.user?.password, undefined);
   assert.equal(registerOwner.json?.data?.user?.refreshToken, undefined);
 
@@ -167,36 +166,6 @@ try {
   });
   assert.equal(address.status, 201);
   assert.equal(Boolean(address.json?.data?.isDefault), true);
-  const addressId = Number(address.json?.data?.id);
-
-  const variant = await prisma.variant.findFirst({ include: { product: true } });
-  assert.ok(variant, 'variant seed is required');
-  const order = await prisma.order.create({
-    data: {
-      orderNumber: `P7-${Date.now()}`,
-      userId: ownerId,
-      addressId,
-      subtotal: variant.price,
-      shippingFee: 0,
-      discount: 0,
-      totalAmount: variant.price,
-      status: 'PENDING',
-      items: {
-        create: {
-          variantId: variant.id,
-          productName: variant.product.name,
-          variantName: variant.name,
-          price: variant.price,
-          quantity: 1,
-        },
-      },
-    },
-  });
-
-  const ownerOrders = await request('/account/orders', { jar: ownerJar });
-  assert.equal(ownerOrders.status, 200);
-  assert.ok(ownerOrders.json?.data?.some((item) => item.id === order.id));
-
   const otherJar = new CookieJar();
   const registerOther = await request('/auth/register', {
     method: 'POST',
@@ -212,9 +181,6 @@ try {
   assert.equal(registerOther.status, 201);
   const foreignService = await request(`/account/service-requests/${serviceRequestId}`, { jar: otherJar });
   assert.equal(foreignService.status, 404);
-  const foreignOrder = await request(`/account/orders/${order.id}`, { jar: otherJar });
-  assert.equal(foreignOrder.status, 404);
-
   const attackEmail = `missing.${Date.now()}@example.com`;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const failed = await request('/auth/login', {

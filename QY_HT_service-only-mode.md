@@ -8,12 +8,12 @@ Phạm vi chặn là Product, Category/Brand của catalog sản phẩm, Cart v�
 
 ## 2. Ma trận cấu hình
 
-| Ứng dụng | Biến | Mặc định an toàn | Legacy local |
-|---|---|---:|---:|
-| NestJS backend | `SERVICE_ONLY_MODE` | `true` | `false` |
-| Mock API | `SERVICE_ONLY_MODE` | `true` | `false` |
-| Website khách hàng | `VITE_SERVICE_ONLY_MODE` | `true` | `false` trong commit Giai đoạn 1 |
-| Website quản trị | `VITE_SERVICE_ONLY_MODE` | `true` | `false` |
+| Ứng dụng           | Biến                     | Mặc định an toàn | Sau Giai đoạn 4                                    |
+| ------------------ | ------------------------ | ---------------: | -------------------------------------------------- |
+| NestJS backend     | `SERVICE_ONLY_MODE`      |           `true` | `false` không khôi phục module commerce đã gỡ      |
+| Mock API           | `SERVICE_ONLY_MODE`      |           `true` | `false` không khôi phục router/seed commerce đã gỡ |
+| Website khách hàng | `VITE_SERVICE_ONLY_MODE` |           `true` | Source/bundle commerce không còn tồn tại           |
+| Website quản trị   | `VITE_SERVICE_ONLY_MODE` |           `true` | Source/bundle commerce không còn tồn tại           |
 
 Giá trị hợp lệ chỉ là `true` hoặc `false` (backend/mock cũng chấp nhận `1` và `0`). Giá trị khác phải làm cấu hình thất bại sớm.
 
@@ -21,9 +21,9 @@ Giá trị hợp lệ chỉ là `true` hoặc `false` (backend/mock cũng chấp
 
 - Production bắt buộc `SERVICE_ONLY_MODE=true` và `VITE_SERVICE_ONLY_MODE=true`. Backend, Mock API và hai frontend đều từ chối khởi động/build nếu production đặt `false`.
 - Staging nên luôn chạy service-only để mô phỏng production.
-- Local chỉ được đặt `false` tạm thời để so sánh legacy, xuất dữ liệu hoặc chạy regression trong thời gian refactor.
-- `mock-api npm run dev` mặc định legacy để giữ bộ test đối chiếu hiện hữu; chạy `node server.js` không khai báo biến sẽ dùng mặc định an toàn `true`.
-- Sau Giai đoạn 2, website khách hàng không còn source/bundle bán hàng; legacy local chỉ còn ý nghĩa cho backend, Mock API và admin phục vụ đối chiếu dữ liệu.
+- Từ Giai đoạn 4, local cũng mặc định `true`. Đặt `false` chỉ bỏ phản hồi tombstone `410`; endpoint commerce vẫn là `404` vì controller/router đã được gỡ và tuyệt đối không dùng để phục hồi bán hàng.
+- `mock-api npm run dev` chạy service-only giống production. Đối chiếu lịch sử dùng snapshot chỉ đọc trong `mock-api/legacy/`, không mount snapshot vào runtime.
+- Muốn quay lại commerce phải checkout/redeploy phiên bản cũ theo quy trình rollback; không được tái kích hoạt bằng feature flag.
 
 ## 4. Hành vi khi bật
 
@@ -48,10 +48,10 @@ Các URL dịch vụ như `/service-categories`, `/service-requests`, `/account/
 
 ### Seed
 
-- Backend bỏ qua product categories, brands, products và coupons bán hàng.
-- Mock seed trả `products=[]` và `orders=[]`; catalog categories/brands bán hàng cũng rỗng.
+- Backend seed không còn câu lệnh tạo product categories, brands, products, coupons hay orders.
+- Mock seed không có các key `products`, `orders`, `categories`, `brands`, `cart` hoặc `inventory`.
 - Service categories, service requests và technicians vẫn được nạp.
-- Dữ liệu lịch sử trong database hiện hữu không bị xóa. Feature flag là cổng truy cập, không phải migration phá hủy dữ liệu.
+- Seed/mock DB trước chuyển đổi được lưu chỉ đọc trong thư mục `legacy/`. Dữ liệu lịch sử trong MySQL hiện hữu không bị xóa vì baseline chưa cho phép migration phá hủy dữ liệu.
 
 ## 5. Cổng kiểm thử
 
@@ -77,7 +77,7 @@ Kiểm tra runtime bổ sung:
 - Không tắt flag ở production để rollback. Rollback phải dùng phiên bản ứng dụng trước đó sau khi đã đánh giá dữ liệu và bảo mật.
 - Không mở lại API commerce chỉ bằng cách thêm link frontend.
 - Không dùng flag này để chặn quotation/payment dịch vụ.
-- Không xóa bảng hoặc dữ liệu commerce trong Giai đoạn 1–2.
+- Không xóa bảng hoặc dữ liệu commerce vật lý trong Giai đoạn 4. Chỉ xóa đường chạy ứng dụng; contract migration chờ hoàn tất archive/checksum, schema reconciliation và backup/restore drill theo baseline Giai đoạn 0.
 
 ## 7. Tham khảo trình bày
 

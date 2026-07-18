@@ -12,7 +12,9 @@ const isDevFeatureEnabled = () => {
 
 const isDemoAccountsEnabled = () => {
   if (isProduction()) return false;
-  return process.env.ENABLE_DEMO_ACCOUNTS === 'true' || process.env.MOCK_ENABLE_DEMO_ACCOUNTS === 'true';
+  return (
+    process.env.ENABLE_DEMO_ACCOUNTS === 'true' || process.env.MOCK_ENABLE_DEMO_ACCOUNTS === 'true'
+  );
 };
 
 // ================================================================
@@ -23,27 +25,36 @@ const adminUsers = [
   {
     id: 'ADM-001',
     name: 'Owner Điện Lạnh 247',
+    firstName: 'Điện Lạnh 247',
+    lastName: 'Owner',
+    phone: '0909000247',
     email: adminEmail,
     password: adminPassword,
     role: 'superadmin', // upgraded from 'owner' to align with RBAC
-    status: 'active'
+    status: 'active',
   },
   {
     id: 'ADM-002',
     name: 'Admin Vận hành',
+    firstName: 'Vận hành',
+    lastName: 'Admin',
+    phone: '0909000248',
     email: 'admin@dienlanh247.vn',
     password: process.env.ADMIN2_PASSWORD || 'Admin@456',
     role: 'admin',
-    status: 'active'
+    status: 'active',
   },
   {
     id: 'ADM-003',
     name: 'Staff Chăm sóc khách hàng',
+    firstName: 'Chăm sóc khách hàng',
+    lastName: 'Staff',
+    phone: '0909000249',
     email: 'staff@dienlanh247.vn',
     password: process.env.STAFF_PASSWORD || 'Staff@789',
     role: 'staff',
-    status: 'active'
-  }
+    status: 'active',
+  },
 ];
 
 const adminSessions = [];
@@ -56,74 +67,100 @@ const adminSessions = [];
 const ROLE_PERMISSIONS = {
   superadmin: [
     'dashboard:read',
-    'products:read',
-    'products:create',
-    'products:update',
-    'products:delete',
-    'orders:read',
-    'orders:update',
     'customers:read',
     'customers:update',
     'settings:read',
     'settings:update',
     'serviceRequests:read',
     'serviceRequests:update',
+    'operations:read',
+    'operations:update',
+    'notifications:read',
     'technicians:read',
     'technicians:create',
     'technicians:update',
     'technicians:delete',
     'technicians:assign',
-    'adminUsers:manage'
+    'adminUsers:manage',
   ],
   admin: [
     'dashboard:read',
-    'products:read',
-    'products:create',
-    'products:update',
-    'orders:read',
-    'orders:update',
     'customers:read',
     'settings:read',
     'serviceRequests:read',
     'serviceRequests:update',
+    'operations:read',
+    'operations:update',
+    'notifications:read',
     'technicians:read',
     'technicians:create',
     'technicians:update',
-    'technicians:assign'
+    'technicians:assign',
   ],
   staff: [
     'dashboard:read',
-    'products:read',
-    'orders:read',
-    'orders:update',
+    'customers:read',
     'serviceRequests:read',
     'serviceRequests:update',
-    'technicians:read'
-  ]
+    'operations:read',
+    'operations:update',
+    'notifications:read',
+    'technicians:read',
+  ],
 };
 
 // Dot-separated permissions mirror the real backend contract consumed by the
-// admin frontend. Route middleware keeps its colon-separated permissions until
-// the commerce routers are removed in Phase 4.
+// admin frontend.
 const UI_ROLE_PERMISSIONS = {
   superadmin: [
-    'dashboard.view', 'customers.view', 'customers.manage', 'services.view',
-    'services.manage', 'technicians.view', 'technicians.manage',
-    'operations.view', 'operations.manage', 'content.view', 'content.manage',
-    'settings.view', 'settings.manage', 'notifications.view', 'profile.view',
-    'profile.manage', 'audit.view'
+    'dashboard.view',
+    'customers.view',
+    'customers.manage',
+    'services.view',
+    'services.manage',
+    'technicians.view',
+    'technicians.manage',
+    'operations.view',
+    'operations.manage',
+    'content.view',
+    'content.manage',
+    'settings.view',
+    'settings.manage',
+    'notifications.view',
+    'profile.view',
+    'profile.manage',
+    'audit.view',
   ],
   admin: [
-    'dashboard.view', 'customers.view', 'customers.manage', 'services.view',
-    'services.manage', 'technicians.view', 'technicians.manage',
-    'operations.view', 'operations.manage', 'content.view', 'content.manage',
-    'settings.view', 'notifications.view', 'profile.view', 'profile.manage'
+    'dashboard.view',
+    'customers.view',
+    'customers.manage',
+    'services.view',
+    'services.manage',
+    'technicians.view',
+    'technicians.manage',
+    'operations.view',
+    'operations.manage',
+    'content.view',
+    'content.manage',
+    'settings.view',
+    'notifications.view',
+    'profile.view',
+    'profile.manage',
   ],
   staff: [
-    'dashboard.view', 'customers.view', 'services.view', 'services.manage',
-    'technicians.view', 'operations.view', 'operations.manage', 'content.view',
-    'notifications.view', 'profile.view', 'profile.manage'
-  ]
+    'dashboard.view',
+    'customers.view',
+    'services.view',
+    'services.manage',
+    'technicians.view',
+    'operations.view',
+    'operations.manage',
+    'content.view',
+    'notifications.view',
+    'profile.view',
+    'profile.manage',
+  ],
 };
 
 const getUiPermissions = (role) => [...(UI_ROLE_PERMISSIONS[role] || [])];
@@ -131,7 +168,7 @@ const getUiPermissions = (role) => [...(UI_ROLE_PERMISSIONS[role] || [])];
 /**
  * Check if a role has the given permission.
  * @param {string} role - 'superadmin' | 'admin' | 'staff'
- * @param {string} permission - e.g. 'products:delete'
+ * @param {string} permission - e.g. 'operations:update'
  */
 const hasPermission = (role, permission) => {
   const perms = ROLE_PERMISSIONS[role] || [];
@@ -144,7 +181,7 @@ const hasPermission = (role, permission) => {
 const parseCookies = (cookieHeader) => {
   const list = {};
   if (!cookieHeader) return list;
-  cookieHeader.split(';').forEach(cookie => {
+  cookieHeader.split(';').forEach((cookie) => {
     let parts = cookie.split('=');
     list[parts.shift().trim()] = decodeURI(parts.join('='));
   });
@@ -169,18 +206,20 @@ const requireAdminAuth = (req, res, next) => {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
-  const session = adminSessions.find(s => s.token === token);
+  const session = adminSessions.find((s) => s.token === token);
   if (!session) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
   if (Date.now() > session.expiresAt) {
-    const index = adminSessions.findIndex(s => s.token === token);
+    const index = adminSessions.findIndex((s) => s.token === token);
     if (index !== -1) adminSessions.splice(index, 1);
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
-  const adminRaw = adminUsers.find(u => u.id === session.adminId);
+  session.lastUsedAt = Date.now();
+
+  const adminRaw = adminUsers.find((u) => u.id === session.adminId);
   // Strip password from req.admin — never expose credentials to route handlers
   const { password: _, ...adminSafe } = adminRaw;
   req.admin = { ...adminSafe, permissions: getUiPermissions(adminSafe.role) };
@@ -198,11 +237,18 @@ const requirePermission = (permission) => {
     (req, res, next) => {
       if (!hasPermission(req.admin.role, permission)) {
         const { auditDenied } = require('./auditLog');
-        auditDenied(req, 'RBAC_FORBIDDEN', req.baseUrl + req.path, null, { requiredPermission: permission }, 'Access denied by RBAC');
+        auditDenied(
+          req,
+          'RBAC_FORBIDDEN',
+          req.baseUrl + req.path,
+          null,
+          { requiredPermission: permission },
+          'Access denied by RBAC',
+        );
         return res.status(403).json({ success: false, message: 'Forbidden' });
       }
       next();
-    }
+    },
   ];
 };
 
@@ -230,5 +276,5 @@ module.exports = {
   isProduction,
   isDevFeatureEnabled,
   isDemoAccountsEnabled,
-  requireDevOnly
+  requireDevOnly,
 };

@@ -18,7 +18,10 @@ const source = (relativePath) => readFileSync(path.join(root, relativePath), 'ut
 
 test('service-only flag defaults safe and production cannot disable it', () => {
   assert.equal(resolveServiceOnlyMode({ NODE_ENV: 'test' }), true);
-  assert.equal(resolveServiceOnlyMode({ NODE_ENV: 'development', SERVICE_ONLY_MODE: 'false' }), false);
+  assert.equal(
+    resolveServiceOnlyMode({ NODE_ENV: 'development', SERVICE_ONLY_MODE: 'false' }),
+    false,
+  );
   assert.throws(
     () => resolveServiceOnlyMode({ NODE_ENV: 'production', SERVICE_ONLY_MODE: 'false' }),
     /must be true in production/,
@@ -37,7 +40,8 @@ test('commerce path matcher does not collide with service quotation or payment',
     '/admin/products',
     '/admin/orders/42',
     '/account/orders/42',
-  ]) assert.equal(isCommerceApiPath(value), true, value);
+  ])
+    assert.equal(isCommerceApiPath(value), true, value);
 
   for (const value of [
     '/service-categories',
@@ -45,7 +49,8 @@ test('commerce path matcher does not collide with service quotation or payment',
     '/account/service-requests',
     '/admin/operations/service-requests/SR-1/quotes',
     '/admin/operations/service-requests/SR-1/payments',
-  ]) assert.equal(isCommerceApiPath(value), false, value);
+  ])
+    assert.equal(isCommerceApiPath(value), false, value);
 });
 
 test('mock guard rejects commerce directly with a stable 410 contract', () => {
@@ -53,14 +58,18 @@ test('mock guard rejects commerce directly with a stable 410 contract', () => {
   let statusCode = 0;
   let payload;
   const response = {
-    status(value) { statusCode = value; return this; },
-    json(value) { payload = value; return this; },
+    status(value) {
+      statusCode = value;
+      return this;
+    },
+    json(value) {
+      payload = value;
+      return this;
+    },
   };
-  serviceOnlyMiddleware(true)(
-    { path: '/products', url: '/products' },
-    response,
-    () => { nextCalled = true; },
-  );
+  serviceOnlyMiddleware(true)({ path: '/products', url: '/products' }, response, () => {
+    nextCalled = true;
+  });
   assert.equal(nextCalled, false);
   assert.equal(statusCode, 410);
   assert.equal(payload.error.code, 'COMMERCE_DISABLED');
@@ -68,10 +77,9 @@ test('mock guard rejects commerce directly with a stable 410 contract', () => {
 
 test('service-only mock seed excludes commerce but preserves service fixtures', () => {
   const data = getInitialData({ NODE_ENV: 'test', SERVICE_ONLY_MODE: 'true' });
-  assert.deepEqual(data.products, []);
-  assert.deepEqual(data.orders, []);
-  assert.deepEqual(data.categories, []);
-  assert.deepEqual(data.brands, []);
+  for (const key of ['products', 'orders', 'categories', 'brands', 'cart', 'inventory']) {
+    assert.equal(key in data, false, `${key} must be absent from the default mock contract`);
+  }
   assert.ok(data.serviceCategories.length > 0);
   assert.ok(data.serviceRequests.length > 0);
   assert.ok(data.technicians.length > 0);
@@ -90,8 +98,9 @@ test('all four applications declare the feature flag and server guard is global'
   assert.match(backendEnvironment, /SERVICE_ONLY_MODE must be true in production/);
   assert.match(backendModule, /APP_GUARD, useClass: ServiceOnlyGuard/);
   assert.match(backendGuard, /COMMERCE_DISABLED/);
-  assert.match(backendDashboard, /getServiceOnlyDashboardStats/);
-  assert.match(accountService, /serviceOnlyMode \? '0'/);
+  assert.match(backendDashboard, /OperationsService/);
+  assert.match(backendDashboard, /contractVersion: 'service-only-v1'/);
+  assert.doesNotMatch(accountService, /prisma\.order|listOrders|getOrder/);
   assert.match(customerEnvironment, /VITE_SERVICE_ONLY_MODE/);
   assert.match(adminEnvironment, /VITE_SERVICE_ONLY_MODE/);
   assert.match(mockServer, /serviceOnlyMiddleware\(serviceOnlyMode\)/);
@@ -108,7 +117,7 @@ test('admin commerce routes stay gated while the customer app is permanently ser
   assert.doesNotMatch(customerRouter, /pages\/(?:Products|ProductDetail|Cart|Checkout|Orders)/);
   assert.doesNotMatch(customerHeader, /serviceOnlyMode|ShoppingCart|cartStore/);
   assert.match(adminRouter, /path="orders\/\*"/);
-  assert.match(adminNavigation, /commerceOnly: true/);
+  assert.doesNotMatch(adminNavigation, /commerceOnly|\/products|\/orders/);
   assert.match(customerRouter, /path="service-booking"/);
   assert.match(adminNavigation, /\/operations/);
 });

@@ -54,12 +54,9 @@ test('Phase 13 sitemap and robots are generated from environment and published A
 
 test('Phase 13 public APIs publish CDN cache policy without caching admin writes', () => {
   const contentController = read('backend/src/modules/content/content.controller.ts');
-  const productController = read('backend/src/modules/products/products.controller.ts');
-  for (const source of [contentController, productController]) {
-    assert.match(source, /stale-while-revalidate/);
-    assert.match(source, /Cache-Control/);
-    assert.match(source, /Vary/);
-  }
+  assert.match(contentController, /stale-while-revalidate/);
+  assert.match(contentController, /Cache-Control/);
+  assert.match(contentController, /Vary/);
   assert.doesNotMatch(contentController.match(/@Post[\s\S]*$/)?.[0] || '', /PUBLIC_DETAIL_CACHE/);
 });
 

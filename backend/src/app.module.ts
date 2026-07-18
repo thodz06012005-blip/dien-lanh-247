@@ -14,9 +14,6 @@ import { MailModule } from './integrations/mail/mail.module';
 import { VnpayModule } from './integrations/payment/vnpay/vnpay.module';
 import { AuditLogModule } from './modules/audit/audit-log.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { BrandsModule } from './modules/brands/brands.module';
-import { CartModule } from './modules/cart/cart.module';
-import { CategoriesModule } from './modules/categories/categories.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { ContentModule } from './modules/content/content.module';
 import { CustomersModule } from './modules/customers/customers.module';
@@ -24,8 +21,6 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './modules/health/health.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OperationsModule } from './modules/operations/operations.module';
-import { OrdersModule } from './modules/orders/orders.module';
-import { ProductsModule } from './modules/products/products.module';
 import { ServiceCategoriesModule } from './modules/service-categories/service-categories.module';
 import { ServiceRequestsModule } from './modules/service-requests/service-requests.module';
 import { SettingsModule } from './modules/settings/settings.module';
@@ -54,11 +49,6 @@ import { UsersModule } from './modules/users/users.module';
     HealthModule,
     UsersModule,
     AuthModule,
-    ProductsModule,
-    CategoriesModule,
-    BrandsModule,
-    CartModule,
-    OrdersModule,
     CloudinaryModule,
     VnpayModule,
     MailModule,

@@ -1,3 +1,10 @@
+# SNAPSHOT KẾ HOẠCH COMMERCE TRƯỚC SERVICE-ONLY
+
+> Trạng thái: **Lưu trữ chỉ đọc**. Tài liệu này mô tả contract Mock API cũ có
+> Product/Order và không còn là hướng dẫn triển khai. Contract hiện hành nằm tại
+> `HD_API_service-only-contract.md`; tuyệt đối không mount lại các router được mô
+> tả bên dưới vào runtime.
+
 # KẾ HOẠCH REFACTOR VÀ TÁCH FILE MOCK-API/SERVER.JS
 
 Tài liệu này lập bản đồ chi tiết cấu trúc hiện tại của `mock-api/server.js` và vạch ra lộ trình tách tệp tin một cách an toàn, đảm bảo không phá vỡ các nghiệp vụ quan trọng đã được sửa đổi và kiểm thử ở các bước trước.
