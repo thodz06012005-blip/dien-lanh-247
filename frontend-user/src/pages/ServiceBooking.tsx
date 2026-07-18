@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -56,8 +56,8 @@ interface BookingForm {
 const steps = [
   { id: 1, label: 'Liên hệ', icon: UserRound },
   { id: 2, label: 'Thiết bị', icon: Wrench },
-  { id: 3, label: 'Lịch và ảnh', icon: CalendarDays },
-  { id: 4, label: 'Xác nhận', icon: ShieldCheck },
+  { id: 3, label: 'Địa chỉ & lịch', icon: CalendarDays },
+  { id: 4, label: 'Ảnh & xác nhận', icon: ShieldCheck },
 ];
 
 export default function ServiceBooking() {
@@ -68,6 +68,8 @@ export default function ServiceBooking() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [pricingAccepted, setPricingAccepted] = useState(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
   const [form, setForm] = useState<BookingForm>({
     customerName: '',
     customerPhone: '',
@@ -129,10 +131,6 @@ export default function ServiceBooking() {
         showError('Email chưa đúng định dạng.');
         return false;
       }
-      if (!form.customerAddress.trim() || !form.district) {
-        showError('Vui lòng nhập đầy đủ địa chỉ phục vụ.');
-        return false;
-      }
     }
     if (currentStep === 2) {
       if (!form.serviceCategoryId || !form.applianceType.trim()) {
@@ -144,9 +142,15 @@ export default function ServiceBooking() {
         return false;
       }
     }
-    if (currentStep === 3 && (!form.preferredDate || !form.preferredTimeSlot)) {
-      showError('Vui lòng chọn ngày và khung giờ mong muốn.');
-      return false;
+    if (currentStep === 3) {
+      if (!form.customerAddress.trim() || !form.district) {
+        showError('Vui lòng nhập đầy đủ địa chỉ phục vụ.');
+        return false;
+      }
+      if (!form.preferredDate || !form.preferredTimeSlot) {
+        showError('Vui lòng chọn ngày và khung giờ mong muốn.');
+        return false;
+      }
     }
     return true;
   };
@@ -168,9 +172,14 @@ export default function ServiceBooking() {
 
   const submit = async () => {
     if (!validateStep(1) || !validateStep(2) || !validateStep(3)) return;
+    if (!pricingAccepted) {
+      showError('Vui lòng xác nhận đã hiểu giá hiển thị chỉ là tham khảo.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const phone = form.customerPhone.replace(/\s+/g, '').trim();
+      idempotencyKeyRef.current ||= crypto.randomUUID();
       const response = await createServiceRequest({
         ...form,
         customerName: form.customerName.trim(),
@@ -180,7 +189,9 @@ export default function ServiceBooking() {
         applianceType: form.applianceType.trim(),
         issueDescription: form.issueDescription.trim(),
         note: form.note.trim(),
-      });
+        pricingDisclosureAccepted: true,
+        pricingDisclosureVersion: '2026-07-v1',
+      }, idempotencyKeyRef.current);
       let mediaUploaded = files.length === 0;
       if (files.length) {
         try {
@@ -208,6 +219,8 @@ export default function ServiceBooking() {
   };
 
   const selectedCategory = categories.find((category) => category.id === form.serviceCategoryId);
+  const formatCurrency = (value: number | string | null | undefined) =>
+    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value || 0));
 
   return (
     <PageTransition>
@@ -264,13 +277,11 @@ export default function ServiceBooking() {
             {step === 1 && (
               <div className="space-y-6">
                 <div><p className="text-xs font-black uppercase tracking-[0.16em] text-primary-700">Bước 1</p><h2 id="booking-step-1" className="mt-2 text-2xl font-black text-slate-950">Thông tin liên hệ</h2><p className="mt-2 text-sm text-slate-600">Thông tin này chỉ dùng để xác nhận và điều phối kỹ thuật viên.</p></div>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-3">
                   <Input label="Họ và tên *" value={form.customerName} onChange={(event) => set('customerName', event.target.value)} placeholder="Nguyễn Văn A" leftIcon={<UserRound aria-hidden="true" className="h-4 w-4" />} />
                   <Input label="Số điện thoại *" value={form.customerPhone} onChange={(event) => set('customerPhone', event.target.value)} placeholder="0912345678" leftIcon={<Phone aria-hidden="true" className="h-4 w-4" />} />
                   <Input label="Email nhận xác nhận *" type="email" value={form.customerEmail} onChange={(event) => set('customerEmail', event.target.value)} placeholder="ban@example.com" leftIcon={<Mail aria-hidden="true" className="h-4 w-4" />} />
-                  <div className="flex flex-col gap-1.5"><label htmlFor="booking-district" className="text-sm font-semibold text-slate-700">Quận/Huyện *</label><select id="booking-district" value={form.district} onChange={(event) => set('district', event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10"><option value="">Chọn khu vực</option>{DISTRICT_OPTIONS.map((area) => <option key={area.value} value={area.value}>{area.label}</option>)}</select></div>
                 </div>
-                <Input label="Địa chỉ chi tiết *" value={form.customerAddress} onChange={(event) => set('customerAddress', event.target.value)} placeholder="Số nhà, đường, phường/xã" leftIcon={<MapPin aria-hidden="true" className="h-4 w-4" />} />
               </div>
             )}
 
@@ -288,17 +299,19 @@ export default function ServiceBooking() {
 
             {step === 3 && (
               <div className="space-y-6">
-                <div><p className="text-xs font-black uppercase tracking-[0.16em] text-primary-700">Bước 3</p><h2 id="booking-step-3" className="mt-2 text-2xl font-black text-slate-950">Lịch mong muốn và hình ảnh</h2><p className="mt-2 text-sm text-slate-600">Bạn có thể tải tối đa 5 ảnh, mỗi ảnh không quá 5 MB.</p></div>
+                <div><p className="text-xs font-black uppercase tracking-[0.16em] text-primary-700">Bước 3</p><h2 id="booking-step-3" className="mt-2 text-2xl font-black text-slate-950">Địa chỉ và lịch mong muốn</h2><p className="mt-2 text-sm text-slate-600">Khung giờ là khoảng thời gian mong muốn và chỉ được chốt sau khi điều phối viên xác nhận.</p></div>
+                <div className="grid gap-4 sm:grid-cols-2"><div className="flex flex-col gap-1.5"><label htmlFor="booking-district" className="text-sm font-semibold text-slate-700">Quận/Huyện *</label><select id="booking-district" value={form.district} onChange={(event) => set('district', event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10"><option value="">Chọn khu vực</option>{DISTRICT_OPTIONS.map((area) => <option key={area.value} value={area.value}>{area.label}</option>)}</select></div><Input label="Địa chỉ chi tiết *" value={form.customerAddress} onChange={(event) => set('customerAddress', event.target.value)} placeholder="Số nhà, đường, phường/xã" leftIcon={<MapPin aria-hidden="true" className="h-4 w-4" />} /></div>
                 <div className="grid gap-4 sm:grid-cols-2"><Input label="Ngày mong muốn *" type="date" min={today} value={form.preferredDate} onChange={(event) => set('preferredDate', event.target.value)} leftIcon={<CalendarDays aria-hidden="true" className="h-4 w-4" />} /><div className="flex flex-col gap-1.5"><label htmlFor="booking-time" className="text-sm font-semibold text-slate-700">Khung giờ *</label><select id="booking-time" value={form.preferredTimeSlot} onChange={(event) => set('preferredTimeSlot', event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10"><option value="">Chọn khung giờ</option>{TIME_SLOTS.map((slot) => <option key={slot} value={slot}>{slot}</option>)}</select></div></div>
-                <label className="group flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 text-center transition hover:border-primary-400 hover:bg-primary-50"><UploadCloud aria-hidden="true" className="h-8 w-8 text-primary-600" /><strong className="mt-3 text-sm text-slate-900">Chọn ảnh hiện trạng</strong><span className="mt-1 text-xs text-slate-600">JPG, PNG, WebP · tối đa 5 ảnh</span><input className="sr-only" type="file" accept="image/*" multiple onChange={(event) => handleFiles(event.target.files)} /></label>
-                {previews.length > 0 && <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">{previews.map((preview, index) => <div key={`${preview.file.name}-${index}`} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"><img src={preview.url} alt={`Ảnh hiện trạng ${index + 1}`} width="240" height="240" className="aspect-square w-full object-cover" /><button type="button" aria-label={`Xóa ảnh ${index + 1}`} onClick={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))} className="absolute right-1.5 top-1.5 rounded-full bg-slate-950/80 p-2 text-white"><X aria-hidden="true" className="h-3.5 w-3.5" /></button></div>)}</div>}
-                <div><label htmlFor="booking-note" className="text-sm font-semibold text-slate-700">Ghi chú thêm</label><textarea id="booking-note" value={form.note} onChange={(event) => set('note', event.target.value)} rows={3} placeholder="Ví dụ: Gọi trước 30 phút, có chỗ gửi xe..." className="mt-1.5 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10" /></div>
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-6 text-amber-950"><Clock3 aria-hidden="true" className="mr-2 inline h-4 w-4" />Đây là yêu cầu lịch, chưa phải lịch hẹn đã xác nhận. Chúng tôi sẽ phản hồi và gửi thông báo khi kỹ thuật viên được điều phối.</div>
               </div>
             )}
 
             {step === 4 && (
               <div className="space-y-6">
-                <div><p className="text-xs font-black uppercase tracking-[0.16em] text-primary-700">Bước 4</p><h2 id="booking-step-4" className="mt-2 text-2xl font-black text-slate-950">Kiểm tra trước khi gửi</h2><p className="mt-2 text-sm text-slate-600">Sau khi gửi, bạn nhận mã tra cứu duy nhất và email xác nhận.</p></div>
+                <div><p className="text-xs font-black uppercase tracking-[0.16em] text-primary-700">Bước 4</p><h2 id="booking-step-4" className="mt-2 text-2xl font-black text-slate-950">Ảnh, ghi chú và xác nhận</h2><p className="mt-2 text-sm text-slate-600">Ảnh là tùy chọn. Sau khi gửi, bạn nhận mã tra cứu duy nhất và email xác nhận.</p></div>
+                <label className="group flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 text-center transition motion-reduce:transition-none hover:border-primary-400 hover:bg-primary-50"><UploadCloud aria-hidden="true" className="h-8 w-8 text-primary-600" /><strong className="mt-3 text-sm text-slate-900">Chọn ảnh hiện trạng</strong><span className="mt-1 text-xs text-slate-600">JPG, PNG, WebP · tối đa 5 ảnh, mỗi ảnh 5 MB</span><input className="sr-only" type="file" accept="image/*" multiple onChange={(event) => handleFiles(event.target.files)} /></label>
+                {previews.length > 0 && <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">{previews.map((preview, index) => <div key={`${preview.file.name}-${index}`} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"><img src={preview.url} alt={`Ảnh hiện trạng ${index + 1}`} width="240" height="240" className="aspect-square w-full object-cover" /><button type="button" aria-label={`Xóa ảnh ${index + 1}`} onClick={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))} className="absolute right-1.5 top-1.5 rounded-full bg-slate-950/80 p-2 text-white"><X aria-hidden="true" className="h-3.5 w-3.5" /></button></div>)}</div>}
+                <div><label htmlFor="booking-note" className="text-sm font-semibold text-slate-700">Ghi chú thêm</label><textarea id="booking-note" value={form.note} onChange={(event) => set('note', event.target.value)} rows={3} placeholder="Ví dụ: Gọi trước 30 phút, có chỗ gửi xe..." className="mt-1.5 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10" /></div>
                 <div className="grid gap-4 sm:grid-cols-2">{[
                   ['Khách hàng', form.customerName],
                   ['Liên hệ', `${form.customerPhone} · ${form.customerEmail}`],
@@ -309,6 +322,7 @@ export default function ServiceBooking() {
                   ['Ưu tiên', PRIORITIES.find((item) => item.value === form.priority)?.label],
                   ['Hình ảnh', files.length ? `${files.length} ảnh` : 'Không có'],
                 ].map(([label, value]) => <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><span className="text-[10px] font-black uppercase tracking-wider text-slate-600">{label}</span><strong className="mt-1 block text-sm leading-6 text-slate-900">{value}</strong></div>)}</div>
+                <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5"><div className="flex flex-wrap items-end justify-between gap-3"><div><span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">Giá tham khảo</span><strong className="mt-1 block text-lg text-emerald-950">{selectedCategory?.referencePriceMin ? `${formatCurrency(selectedCategory.referencePriceMin)} – ${formatCurrency(selectedCategory.referencePriceMax)}` : 'Sẽ báo sau khảo sát'}</strong></div><div className="text-right text-xs text-emerald-900"><span className="block">Phí khảo sát tham khảo</span><strong>{formatCurrency(selectedCategory?.surveyFee)}</strong></div></div><p className="mt-3 text-xs leading-6 text-emerald-950">{selectedCategory?.pricingNote || 'Giá trên không phải giá chốt tự động. Kỹ thuật viên kiểm tra, lập báo giá và chỉ thực hiện sau khi bạn đồng ý.'}</p><label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-white/70 p-3 text-xs font-bold leading-5 text-slate-800"><input type="checkbox" checked={pricingAccepted} onChange={(event) => setPricingAccepted(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500" /><span>Tôi hiểu đây là khoảng giá tham khảo; báo giá chính thức và phí khảo sát (nếu có) phải được thông báo trước.</span></label></div>
                 <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-xs leading-6 text-blue-900"><ShieldCheck aria-hidden="true" className="mr-2 inline h-4 w-4" />Thông tin liên hệ sẽ không hiển thị đầy đủ trên trang tra cứu. Kỹ thuật viên chỉ nhận thông tin cần thiết sau khi được phân công.</div>
               </div>
             )}

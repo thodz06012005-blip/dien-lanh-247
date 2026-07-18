@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../../core/database/prisma.service';
+import { MailService } from '../../integrations/mail/mail.service';
 import {
   CompletionReportDto,
   CreateQuoteDto,
@@ -62,7 +63,15 @@ const publicCode = (prefix: string) => `${prefix}-${new Date().toISOString().sli
 
 @Injectable()
 export class OperationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly mailService: MailService) {}
+
+  private async emailMilestone(requestId: string, title: string, detail: string) {
+    const rows = await this.prisma.$queryRawUnsafe<Array<{ customerEmail: string | null }>>(
+      'SELECT customerEmail FROM ServiceRequest WHERE id = ? LIMIT 1', requestId,
+    );
+    const email = rows[0]?.customerEmail;
+    if (email) void this.mailService.sendServiceRequestMilestone(email, { code: requestId, title, detail }).catch(() => undefined);
+  }
 
   private async audit(
     requestId: string,
@@ -483,6 +492,7 @@ export class OperationsService {
       await this.audit(requestId, 'QUOTE_SENT', actor, { quoteId, quoteNumber, totalAmount: calculated.totalAmount, version }, tx as PrismaService);
       return { id: quoteId, quoteNumber, version, ...calculated };
     });
+    await this.emailMilestone(requestId, `Báo giá phiên bản ${quote.version} đã sẵn sàng`, `Tổng báo giá: ${new Intl.NumberFormat('vi-VN').format(quote.totalAmount)} đ. Vui lòng xem chi tiết và xác nhận trước khi thực hiện.`);
     return { ...quote, status: 'SENT', confirmationToken, confirmationUrl: `/quote-confirmation?token=${encodeURIComponent(confirmationToken)}` };
   }
 
@@ -497,6 +507,7 @@ export class OperationsService {
       await tx.$executeRawUnsafe(`UPDATE ServiceQuote SET status=?, customerConfirmedAt=?, customerRejectedAt=?, confirmationTokenHash=NULL, notes=CONCAT(COALESCE(notes,''), ?) WHERE id=?`, accepted ? 'ACCEPTED' : 'REJECTED', accepted ? new Date() : null, accepted ? null : new Date(), dto.note ? `\nKhách hàng: ${dto.note}` : '', quote.id);
       await tx.$executeRawUnsafe(`INSERT INTO ServiceRequestAudit (requestId, action, actorType, actorName, metadata) VALUES (?, ?, 'CUSTOMER', 'Khách hàng', ?)`, quote.requestId, accepted ? 'QUOTE_ACCEPTED' : 'QUOTE_REJECTED', JSON.stringify({ quoteId: quote.id, note: dto.note ?? null }));
     });
+    await this.emailMilestone(String(quote.requestId), accepted ? 'Báo giá đã được chấp thuận' : 'Báo giá đã bị từ chối', `Báo giá ${String(quote.quoteNumber)}: ${accepted ? 'đã chấp thuận' : 'đã từ chối'}.`);
     return { success: true, decision: dto.decision, quoteNumber: quote.quoteNumber };
   }
 
@@ -538,6 +549,7 @@ export class OperationsService {
       await tx.$executeRawUnsafe(`INSERT INTO ServiceRequestStatusEvent (requestId, fromStatus, toStatus, note, actorType, actorId, actorName, metadata) VALUES (?, ?, 'COMPLETED', 'Lập biên bản hoàn thành', 'ADMIN', ?, ?, ?)`, requestId, request.workflowStatus, String(actor.userId), actor.name || actor.email, JSON.stringify({ reportNumber }));
       await this.audit(requestId, 'COMPLETION_REPORT_CREATED', actor, { reportNumber }, tx as PrismaService);
     });
+    await this.emailMilestone(requestId, 'Biên bản nghiệm thu đã được lập', `Mã biên bản: ${reportNumber}. Bạn có thể xem chẩn đoán và công việc đã thực hiện trong Account Hub.`);
     return { reportNumber, requestId, status: 'COMPLETED' };
   }
 
@@ -552,6 +564,7 @@ export class OperationsService {
       await tx.$executeRawUnsafe(`UPDATE ServiceRequest SET warrantyStartedAt=?, requestVersion=requestVersion+1 WHERE id=?`, startsAt, requestId);
       await this.audit(requestId, 'WARRANTY_CREATED', actor, { warrantyNumber, startsAt, endsAt }, tx as PrismaService);
     });
+    await this.emailMilestone(requestId, 'Hồ sơ bảo hành đã được tạo', `Mã bảo hành: ${warrantyNumber}. Hiệu lực đến ${endsAt.toLocaleDateString('vi-VN')}.`);
     return { warrantyNumber, requestId, status: 'ACTIVE', startsAt, endsAt };
   }
 

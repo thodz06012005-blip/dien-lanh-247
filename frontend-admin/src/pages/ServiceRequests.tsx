@@ -89,7 +89,12 @@ export default function ServiceRequests() {
   const categories: ServiceCategory[] = categoryQuery.data?.data || [];
 
   const confirmMutation = useMutation({
-    mutationFn: (id: string) => updateServiceRequestStatus(id, { status: 'CONFIRMED', note: 'Xác nhận nhanh từ danh sách vận hành' }),
+    mutationFn: ({ id, requestVersion }: { id: string; requestVersion: number }) =>
+      updateServiceRequestStatus(id, {
+        requestVersion,
+        status: 'CONFIRMED',
+        note: 'Xác nhận nhanh từ danh sách vận hành',
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-service-requests'] });
       setToast({ message: 'Đã xác nhận yêu cầu.', type: 'success' });
@@ -139,7 +144,7 @@ export default function ServiceRequests() {
       </Card>
 
       <Card noPadding className="overflow-hidden shadow-sm">
-        {requests.length === 0 ? <div className="p-12 text-center"><CheckCircle2 className="mx-auto h-10 w-10 text-slate-300" /><h2 className="mt-4 font-black text-slate-900">Không có yêu cầu phù hợp</h2><p className="mt-2 text-sm text-slate-500">Thay đổi bộ lọc hoặc chờ yêu cầu mới được gửi.</p></div> : <div className="overflow-x-auto"><table className="w-full min-w-[1100px] text-left text-sm"><thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500"><tr><th className="px-5 py-4">Yêu cầu</th><th className="px-5 py-4">Khách hàng</th><th className="px-5 py-4">Dịch vụ</th><th className="px-5 py-4">Ưu tiên</th><th className="px-5 py-4">Trạng thái</th><th className="px-5 py-4">Kỹ thuật viên</th><th className="px-5 py-4">Lịch mong muốn</th><th className="px-5 py-4 text-right">Thao tác</th></tr></thead><tbody className="divide-y divide-slate-100">{requests.map((request) => <RequestRow key={request.id} request={request} confirming={confirmMutation.isPending} onConfirm={() => confirmMutation.mutate(request.id)} onOpen={() => navigate(`/service-requests/${request.id}`)} />)}</tbody></table></div>}
+        {requests.length === 0 ? <div className="p-12 text-center"><CheckCircle2 className="mx-auto h-10 w-10 text-slate-300" /><h2 className="mt-4 font-black text-slate-900">Không có yêu cầu phù hợp</h2><p className="mt-2 text-sm text-slate-500">Thay đổi bộ lọc hoặc chờ yêu cầu mới được gửi.</p></div> : <div className="overflow-x-auto"><table className="w-full min-w-[1100px] text-left text-sm"><thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500"><tr><th className="px-5 py-4">Yêu cầu</th><th className="px-5 py-4">Khách hàng</th><th className="px-5 py-4">Dịch vụ</th><th className="px-5 py-4">Ưu tiên</th><th className="px-5 py-4">Trạng thái</th><th className="px-5 py-4">Kỹ thuật viên</th><th className="px-5 py-4">Lịch mong muốn</th><th className="px-5 py-4 text-right">Thao tác</th></tr></thead><tbody className="divide-y divide-slate-100">{requests.map((request) => <RequestRow key={request.id} request={request} confirming={confirmMutation.isPending} onConfirm={() => confirmMutation.mutate({ id: request.id, requestVersion: request.requestVersion })} onOpen={() => navigate(`/service-requests/${request.id}`)} />)}</tbody></table></div>}
         <div className="flex flex-col gap-3 border-t border-slate-200 p-4 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="text-slate-500">Hiển thị {requests.length} / {data.meta.total} yêu cầu</span><div className="flex items-center gap-3"><Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Trước</Button><span className="font-bold text-slate-700">{data.meta.page}/{Math.max(data.meta.totalPages, 1)}</span><Button size="sm" variant="outline" disabled={page >= data.meta.totalPages} onClick={() => setPage((value) => value + 1)}>Sau</Button></div></div>
       </Card>
 

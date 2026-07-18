@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -108,7 +109,10 @@ export class ServiceRequestsService {
   private maskName(name: string) {
     const parts = name.trim().split(/\s+/);
     if (parts.length === 1) return `${parts[0].slice(0, 1)}***`;
-    return `${parts[0]} ${parts.slice(1).map((part) => `${part.slice(0, 1)}.`).join(' ')}`;
+    return `${parts[0]} ${parts
+      .slice(1)
+      .map((part) => `${part.slice(0, 1)}.`)
+      .join(' ')}`;
   }
 
   private hashIp(ip?: string) {
@@ -124,6 +128,63 @@ export class ServiceRequestsService {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
+  private submissionFingerprint(dto: CreateServiceRequestDto) {
+    return createHash('sha256')
+      .update(
+        JSON.stringify({
+          ...dto,
+          customerName: dto.customerName.trim(),
+          customerPhone: this.normalizePhone(dto.customerPhone),
+          customerEmail: dto.customerEmail.trim().toLowerCase(),
+          customerAddress: dto.customerAddress.trim(),
+          applianceType: dto.applianceType.trim(),
+          issueDescription: dto.issueDescription.trim(),
+          note: dto.note?.trim() ?? '',
+          images: dto.images ?? [],
+        }),
+      )
+      .digest('hex');
+  }
+
+  private async replaySubmission(keyHash: string, fingerprintHash: string) {
+    const rows = await this.prisma.$queryRawUnsafe<
+      Array<{
+        requestId: string;
+        requestFingerprintHash: string;
+        preferredDate: string;
+        preferredTimeSlot: string;
+      }>
+    >(
+      `SELECT submission.requestId, submission.requestFingerprintHash,
+              request.preferredDate, request.preferredTimeSlot
+       FROM ServiceRequestSubmission submission
+       INNER JOIN ServiceRequest request ON request.id = submission.requestId
+       WHERE submission.idempotencyKeyHash = ? AND submission.expiresAt > NOW(3)
+       LIMIT 1`,
+      keyHash,
+    );
+    const existing = rows[0];
+    if (!existing) return null;
+    if (existing.requestFingerprintHash !== fingerprintHash) {
+      throw new ConflictException(
+        'Khóa gửi lại đã được dùng cho nội dung khác',
+      );
+    }
+    return {
+      success: true as const,
+      message: 'Yêu cầu đã được tiếp nhận trước đó; không tạo bản trùng.',
+      data: {
+        id: existing.requestId,
+        code: existing.requestId,
+        status: 'NEW' as const,
+        confirmationSent: true,
+        preferredDate: existing.preferredDate,
+        preferredTimeSlot: existing.preferredTimeSlot,
+        replayed: true,
+      },
+    };
+  }
+
   private async generateRequestCode() {
     const now = new Date();
     const datePart = [
@@ -135,10 +196,15 @@ export class ServiceRequestsService {
     for (let attempt = 0; attempt < 10; attempt += 1) {
       const randomPart = randomBytes(3).toString('hex').toUpperCase();
       const code = `DL247-${datePart}-${randomPart}`;
-      const existing = await this.prisma.serviceRequest.findUnique({ where: { id: code }, select: { id: true } });
+      const existing = await this.prisma.serviceRequest.findUnique({
+        where: { id: code },
+        select: { id: true },
+      });
       if (!existing) return code;
     }
-    throw new BadRequestException('Không thể tạo mã yêu cầu duy nhất. Vui lòng thử lại.');
+    throw new BadRequestException(
+      'Không thể tạo mã yêu cầu duy nhất. Vui lòng thử lại.',
+    );
   }
 
   private async writeStatusEvent(
@@ -249,7 +315,9 @@ export class ServiceRequestsService {
   }
 
   private normalizeRow(row: RawRequestRow) {
-    const status = isWorkflowStatus(row.workflowStatus) ? row.workflowStatus : 'NEW';
+    const status = isWorkflowStatus(row.workflowStatus)
+      ? row.workflowStatus
+      : 'NEW';
     return {
       ...row,
       status,
@@ -260,7 +328,11 @@ export class ServiceRequestsService {
     };
   }
 
-  private toCustomerView(row: RawRequestRow, timeline: Array<Record<string, unknown>>, media: Array<Record<string, unknown>>) {
+  private toCustomerView(
+    row: RawRequestRow,
+    timeline: Array<Record<string, unknown>>,
+    media: Array<Record<string, unknown>>,
+  ) {
     const normalized = this.normalizeRow(row);
     return {
       code: row.id,
@@ -269,7 +341,10 @@ export class ServiceRequestsService {
       customerPhone: this.maskPhone(row.customerPhone),
       customerEmail: this.maskEmail(row.customerEmail),
       district: row.district,
-      serviceCategory: { id: row.serviceCategoryId, name: row.serviceCategoryName },
+      serviceCategory: {
+        id: row.serviceCategoryId,
+        name: row.serviceCategoryName,
+      },
       applianceType: row.applianceType,
       issueDescription: row.issueDescription,
       priority: row.priority,
@@ -291,7 +366,8 @@ export class ServiceRequestsService {
         toStatus: event.toStatus,
         note: event.note,
         actorType: event.actorType,
-        actorName: event.actorType === 'CUSTOMER' ? 'Khách hàng' : event.actorName,
+        actorName:
+          event.actorType === 'CUSTOMER' ? 'Khách hàng' : event.actorName,
         createdAt: event.createdAt,
       })),
       media: media.map((item) => ({
@@ -305,100 +381,172 @@ export class ServiceRequestsService {
     };
   }
 
-  async create(dto: CreateServiceRequestDto, actor: ServiceRequestActor) {
-    const category = await this.prisma.serviceCategory.findUnique({ where: { id: dto.serviceCategoryId } });
-    if (!category) throw new BadRequestException('Dịch vụ không tồn tại hoặc đã ngừng hoạt động');
+  async create(
+    dto: CreateServiceRequestDto,
+    actor: ServiceRequestActor,
+    idempotencyKey?: string,
+  ) {
+    const normalizedKey = idempotencyKey?.trim();
+    if (
+      normalizedKey &&
+      (normalizedKey.length < 8 || normalizedKey.length > 200)
+    ) {
+      throw new BadRequestException(
+        'Idempotency-Key phải có từ 8 đến 200 ký tự',
+      );
+    }
+    const fingerprintHash = this.submissionFingerprint(dto);
+    const keyHash = normalizedKey
+      ? createHash('sha256').update(normalizedKey).digest('hex')
+      : null;
+    if (keyHash) {
+      const replay = await this.replaySubmission(keyHash, fingerprintHash);
+      if (replay) return replay;
+    }
+
+    const category = await this.prisma.serviceCategory.findUnique({
+      where: { id: dto.serviceCategoryId },
+    });
+    if (!category) {
+      throw new BadRequestException(
+        'Dịch vụ không tồn tại hoặc đã ngừng hoạt động',
+      );
+    }
 
     const preferredDate = new Date(`${dto.preferredDate}T00:00:00+07:00`);
-    if (Number.isNaN(preferredDate.getTime())) throw new BadRequestException('Ngày hẹn không hợp lệ');
+    if (Number.isNaN(preferredDate.getTime())) {
+      throw new BadRequestException('Ngày hẹn không hợp lệ');
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (preferredDate < today) throw new BadRequestException('Ngày hẹn không được ở quá khứ');
+    if (preferredDate < today) {
+      throw new BadRequestException('Ngày hẹn không được ở quá khứ');
+    }
 
     const code = await this.generateRequestCode();
     const phone = this.normalizePhone(dto.customerPhone);
-    const district = dto.district.startsWith('Quận ') || dto.district.startsWith('Huyện ')
-      ? dto.district.trim()
-      : dto.district.trim();
-    const scheduledAt = this.parseScheduledAt(dto.preferredDate, dto.preferredTimeSlot);
+    const district = dto.district.trim();
+    const scheduledAt = this.parseScheduledAt(
+      dto.preferredDate,
+      dto.preferredTimeSlot,
+    );
     const now = new Date().toISOString();
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.serviceRequest.create({
-        data: {
-          id: code,
-          customerName: dto.customerName.trim(),
-          customerPhone: phone,
-          customerAddress: dto.customerAddress.trim(),
-          district,
-          serviceCategoryId: dto.serviceCategoryId,
-          applianceType: dto.applianceType.trim(),
-          issueDescription: dto.issueDescription.trim(),
-          images: dto.images ?? [],
-          preferredDate: dto.preferredDate,
-          preferredTimeSlot: dto.preferredTimeSlot.trim(),
-          note: dto.note?.trim() ?? '',
-          status: ServiceRequestStatus.pending,
-          priority: dto.priority ?? ServiceRequestPriority.medium,
-          estimatedPrice: 0,
-          finalPrice: 0,
-          paymentStatus: 'unpaid',
-          statusHistory: [
-            {
-              status: 'NEW',
-              note: 'Khách hàng vừa gửi yêu cầu dịch vụ',
-              updatedBy: 'customer',
-              createdAt: now,
-            },
-          ],
-        },
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.serviceRequest.create({
+          data: {
+            id: code,
+            customerName: dto.customerName.trim(),
+            customerPhone: phone,
+            customerAddress: dto.customerAddress.trim(),
+            district,
+            serviceCategoryId: dto.serviceCategoryId,
+            applianceType: dto.applianceType.trim(),
+            issueDescription: dto.issueDescription.trim(),
+            images: dto.images ?? [],
+            preferredDate: dto.preferredDate,
+            preferredTimeSlot: dto.preferredTimeSlot.trim(),
+            note: dto.note?.trim() ?? '',
+            status: ServiceRequestStatus.pending,
+            priority: dto.priority ?? ServiceRequestPriority.medium,
+            estimatedPrice: 0,
+            finalPrice: 0,
+            paymentStatus: 'unpaid',
+            statusHistory: [
+              {
+                status: 'NEW',
+                note: 'Khách hàng vừa gửi yêu cầu dịch vụ',
+                updatedBy: 'customer',
+                createdAt: now,
+              },
+            ],
+          },
+        });
+
+        await tx.$executeRawUnsafe(
+          `UPDATE ServiceRequest
+           SET customerEmail = ?, workflowStatus = 'NEW', requestVersion = 1,
+               source = 'WEB', scheduledAt = ?, lastStatusChangedAt = NOW(3),
+               lookupLastFour = ?, pricingDisclosureVersion = ?,
+               pricingDisclosureAcceptedAt = NOW(3),
+               referencePriceMinSnapshot = ?, referencePriceMaxSnapshot = ?,
+               surveyFeeSnapshot = ?
+           WHERE id = ?`,
+          dto.customerEmail.trim().toLowerCase(),
+          scheduledAt,
+          phone.slice(-4),
+          dto.pricingDisclosureVersion,
+          category.referencePriceMin,
+          category.referencePriceMax,
+          category.surveyFee,
+          code,
+        );
+
+        await this.writeStatusEvent(
+          tx as PrismaService,
+          code,
+          null,
+          'NEW',
+          'Khách hàng vừa gửi yêu cầu dịch vụ',
+          actor,
+          {
+            priority: dto.priority ?? ServiceRequestPriority.medium,
+            source: 'WEB',
+          },
+        );
+        await this.writeAudit(
+          tx as PrismaService,
+          code,
+          'SERVICE_REQUEST_CREATED',
+          actor,
+          {
+            serviceCategoryId: dto.serviceCategoryId,
+            applianceType: dto.applianceType.trim(),
+            pricingDisclosureVersion: dto.pricingDisclosureVersion,
+          },
+        );
+        if (keyHash) {
+          await tx.$executeRawUnsafe(
+            `INSERT INTO ServiceRequestSubmission
+               (idempotencyKeyHash, requestFingerprintHash, requestId, expiresAt, createdAt)
+             VALUES (?, ?, ?, DATE_ADD(NOW(3), INTERVAL 24 HOUR), NOW(3))`,
+            keyHash,
+            fingerprintHash,
+            code,
+          );
+        }
       });
+    } catch (error) {
+      if (keyHash) {
+        const replay = await this.replaySubmission(keyHash, fingerprintHash);
+        if (replay) return replay;
+      }
+      throw error;
+    }
 
-      await tx.$executeRawUnsafe(
-        `UPDATE ServiceRequest
-         SET customerEmail = ?, workflowStatus = 'NEW', requestVersion = 1,
-             source = 'WEB', scheduledAt = ?, lastStatusChangedAt = NOW(3),
-             lookupLastFour = ?
-         WHERE id = ?`,
-        dto.customerEmail.trim().toLowerCase(),
-        scheduledAt,
-        phone.slice(-4),
+    void this.mailService
+      .sendServiceRequestConfirmation(dto.customerEmail, {
         code,
-      );
-
-      await this.writeStatusEvent(
-        tx as PrismaService,
-        code,
-        null,
-        'NEW',
-        'Khách hàng vừa gửi yêu cầu dịch vụ',
-        actor,
-        { priority: dto.priority ?? ServiceRequestPriority.medium, source: 'WEB' },
-      );
-      await this.writeAudit(tx as PrismaService, code, 'SERVICE_REQUEST_CREATED', actor, {
-        serviceCategoryId: dto.serviceCategoryId,
-        applianceType: dto.applianceType.trim(),
-      });
-    });
-
-    void this.mailService.sendServiceRequestConfirmation(dto.customerEmail, {
-      code,
-      customerName: dto.customerName.trim(),
-      preferredDate: dto.preferredDate,
-      preferredTimeSlot: dto.preferredTimeSlot,
-      serviceName: category.name,
-    }).catch(() => undefined);
+        customerName: dto.customerName.trim(),
+        preferredDate: dto.preferredDate,
+        preferredTimeSlot: dto.preferredTimeSlot,
+        serviceName: category.name,
+      })
+      .catch(() => undefined);
 
     return {
       success: true,
-      message: 'Yêu cầu đã được tiếp nhận. Mã tra cứu đã gửi tới email của bạn.',
+      message:
+        'Yêu cầu đã được tiếp nhận. Mã tra cứu đã gửi tới email của bạn.',
       data: {
         id: code,
         code,
-        status: 'NEW',
+        status: 'NEW' as const,
         confirmationSent: true,
         preferredDate: dto.preferredDate,
         preferredTimeSlot: dto.preferredTimeSlot,
+        replayed: false,
       },
     };
   }
@@ -407,20 +555,36 @@ export class ServiceRequestsService {
     const normalizedCode = code.trim().toUpperCase();
     const row = await this.getRawRequest(normalizedCode, phone);
     if (!row) {
-      throw new NotFoundException('Không tìm thấy yêu cầu với thông tin đã cung cấp');
+      throw new NotFoundException(
+        'Không tìm thấy yêu cầu với thông tin đã cung cấp',
+      );
     }
-    const [timeline, media] = await Promise.all([this.getTimeline(row.id), this.getMedia(row.id)]);
-    await this.writeAudit(this.prisma, row.id, 'CUSTOMER_LOOKUP_SUCCESS', actor);
+    const [timeline, media] = await Promise.all([
+      this.getTimeline(row.id),
+      this.getMedia(row.id),
+    ]);
+    await this.writeAudit(
+      this.prisma,
+      row.id,
+      'CUSTOMER_LOOKUP_SUCCESS',
+      actor,
+    );
     return { success: true, data: this.toCustomerView(row, timeline, media) };
   }
 
   async findOneCustomer(id: string, phone: string, actor: ServiceRequestActor) {
-    if (!phone) throw new ForbiddenException('Cần mã yêu cầu và số điện thoại để tra cứu');
+    if (!phone)
+      throw new ForbiddenException(
+        'Cần mã yêu cầu và số điện thoại để tra cứu',
+      );
     return this.lookup(id, phone, actor);
   }
 
   async findMyRequests(userId: number) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { phone: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { phone: true },
+    });
     if (!user?.phone) return { success: true, data: [] };
     const phone = this.normalizePhone(user.phone);
     const rows = await this.prisma.$queryRawUnsafe<RawRequestRow[]>(
@@ -452,7 +616,10 @@ export class ServiceRequestsService {
           status: normalized.status,
           priority: row.priority,
           applianceType: row.applianceType,
-          serviceCategory: { id: row.serviceCategoryId, name: row.serviceCategoryName },
+          serviceCategory: {
+            id: row.serviceCategoryId,
+            name: row.serviceCategoryName,
+          },
           preferredDate: row.preferredDate,
           preferredTimeSlot: row.preferredTimeSlot,
           estimatedPrice: normalized.estimatedPrice,
@@ -464,7 +631,9 @@ export class ServiceRequestsService {
     };
   }
 
-  async findAllAdmin(query: ServiceRequestQueryDto = new ServiceRequestQueryDto()) {
+  async findAllAdmin(
+    query: ServiceRequestQueryDto = new ServiceRequestQueryDto(),
+  ) {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
     const offset = (page - 1) * limit;
@@ -503,21 +672,41 @@ export class ServiceRequestsService {
     }
     if (query.q) {
       const keyword = `%${query.q.trim()}%`;
-      clauses.push('(sr.id LIKE ? OR sr.customerName LIKE ? OR sr.customerPhone LIKE ? OR sr.customerEmail LIKE ?)');
+      clauses.push(
+        '(sr.id LIKE ? OR sr.customerName LIKE ? OR sr.customerPhone LIKE ? OR sr.customerEmail LIKE ?)',
+      );
       params.push(keyword, keyword, keyword, keyword);
     }
 
     if (query.quickFilter === 'new') clauses.push("sr.workflowStatus = 'NEW'");
-    if (query.quickFilter === 'unassigned') clauses.push("sr.workflowStatus = 'CONFIRMED' AND sr.assignedTechnicianId IS NULL");
-    if (query.quickFilter === 'active') clauses.push("sr.workflowStatus IN ('ASSIGNED','IN_PROGRESS')");
-    if (query.quickFilter === 'waiting-parts') clauses.push("sr.workflowStatus = 'WAITING_PARTS'");
-    if (query.quickFilter === 'warranty') clauses.push("sr.workflowStatus = 'WARRANTY'");
+    if (query.quickFilter === 'unassigned')
+      clauses.push(
+        "sr.workflowStatus = 'CONFIRMED' AND sr.assignedTechnicianId IS NULL",
+      );
+    if (query.quickFilter === 'active')
+      clauses.push("sr.workflowStatus IN ('ASSIGNED','IN_PROGRESS')");
+    if (query.quickFilter === 'waiting-parts')
+      clauses.push("sr.workflowStatus = 'WAITING_PARTS'");
+    if (query.quickFilter === 'warranty')
+      clauses.push("sr.workflowStatus = 'WARRANTY'");
     if (query.quickFilter === 'overdue') {
-      clauses.push("STR_TO_DATE(sr.preferredDate, '%Y-%m-%d') < CURDATE() AND sr.workflowStatus NOT IN ('COMPLETED','CLOSED','CANCELLED','REJECTED')");
+      clauses.push(
+        "STR_TO_DATE(sr.preferredDate, '%Y-%m-%d') < CURDATE() AND sr.workflowStatus NOT IN ('COMPLETED','CLOSED','CANCELLED','REJECTED')",
+      );
     }
 
-    const allowedSort = new Set(['createdAt', 'updatedAt', 'workflowStatus', 'priority', 'preferredDate', 'district', 'customerName']);
-    const sortBy = allowedSort.has(query.sortBy ?? '') ? query.sortBy : 'createdAt';
+    const allowedSort = new Set([
+      'createdAt',
+      'updatedAt',
+      'workflowStatus',
+      'priority',
+      'preferredDate',
+      'district',
+      'customerName',
+    ]);
+    const sortBy = allowedSort.has(query.sortBy ?? '')
+      ? query.sortBy
+      : 'createdAt';
     const sortOrder = query.sortOrder === 'asc' ? 'ASC' : 'DESC';
     const whereSql = clauses.join(' AND ');
 
@@ -566,7 +755,9 @@ export class ServiceRequestsService {
       success: true,
       data: rows.map((row) => this.normalizeRow(row)),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
-      stats: Object.fromEntries(Object.entries(stats).map(([key, value]) => [key, Number(value ?? 0)])),
+      stats: Object.fromEntries(
+        Object.entries(stats).map(([key, value]) => [key, Number(value ?? 0)]),
+      ),
     };
   }
 
@@ -590,32 +781,71 @@ export class ServiceRequestsService {
     actor: ServiceRequestActor,
   ) {
     const nextStatus = dto.status.toUpperCase();
-    if (!isWorkflowStatus(nextStatus)) throw new BadRequestException('Trạng thái không hợp lệ');
+    if (!isWorkflowStatus(nextStatus))
+      throw new BadRequestException('Trạng thái không hợp lệ');
 
     await this.prisma.$transaction(async (tx) => {
-      const locked = await tx.$queryRawUnsafe<Array<{ workflowStatus: string; assignedTechnicianId: string | null; statusHistory: unknown }>>(
-        'SELECT workflowStatus, assignedTechnicianId, statusHistory FROM ServiceRequest WHERE id = ? FOR UPDATE',
+      const locked = await tx.$queryRawUnsafe<
+        Array<{
+          workflowStatus: string;
+          assignedTechnicianId: string | null;
+          statusHistory: unknown;
+          requestVersion: number;
+          preferredDate: string;
+          preferredTimeSlot: string;
+        }>
+      >(
+        `SELECT workflowStatus, assignedTechnicianId, statusHistory, requestVersion,
+                preferredDate, preferredTimeSlot
+         FROM ServiceRequest WHERE id = ? FOR UPDATE`,
         id,
       );
       const current = locked[0];
-      if (!current || !isWorkflowStatus(current.workflowStatus)) throw new NotFoundException('Không tìm thấy yêu cầu dịch vụ');
+      if (!current || !isWorkflowStatus(current.workflowStatus))
+        throw new NotFoundException('Không tìm thấy yêu cầu dịch vụ');
       const currentStatus = current.workflowStatus;
+      if (current.requestVersion !== dto.requestVersion) {
+        throw new ConflictException(
+          `Yêu cầu đã thay đổi (phiên bản hiện tại ${current.requestVersion}). Vui lòng tải lại trước khi cập nhật.`,
+        );
+      }
 
       if (!assertTransitionAllowed(currentStatus, nextStatus)) {
-        throw new BadRequestException(`Không thể chuyển trạng thái từ ${currentStatus} sang ${nextStatus}`);
+        throw new BadRequestException(
+          `Không thể chuyển trạng thái từ ${currentStatus} sang ${nextStatus}`,
+        );
       }
-      if ((nextStatus === 'ASSIGNED' || nextStatus === 'IN_PROGRESS' || nextStatus === 'COMPLETED') && !current.assignedTechnicianId) {
-        throw new BadRequestException('Yêu cầu phải được phân công kỹ thuật viên trước');
+      if (
+        (nextStatus === 'ASSIGNED' ||
+          nextStatus === 'IN_PROGRESS' ||
+          nextStatus === 'COMPLETED') &&
+        !current.assignedTechnicianId
+      ) {
+        throw new BadRequestException(
+          'Yêu cầu phải được phân công kỹ thuật viên trước',
+        );
       }
-      if (nextStatus === 'RESCHEDULED' && (!dto.preferredDate || !dto.preferredTimeSlot)) {
-        throw new BadRequestException('Cần cung cấp ngày và khung giờ mới khi hẹn lại');
+      if (
+        nextStatus === 'RESCHEDULED' &&
+        (!dto.preferredDate || !dto.preferredTimeSlot)
+      ) {
+        throw new BadRequestException(
+          'Cần cung cấp ngày và khung giờ mới khi hẹn lại',
+        );
       }
-      if (nextStatus === 'COMPLETED' && (dto.finalPrice === undefined || dto.finalPrice < 0)) {
-        throw new BadRequestException('Cần nhập chi phí thực tế hợp lệ khi hoàn thành');
+      if (
+        nextStatus === 'COMPLETED' &&
+        (dto.finalPrice === undefined || dto.finalPrice < 0)
+      ) {
+        throw new BadRequestException(
+          'Cần nhập chi phí thực tế hợp lệ khi hoàn thành',
+        );
       }
 
       const legacyStatus = mapWorkflowToLegacyStatus(nextStatus);
-      const oldHistory = Array.isArray(current.statusHistory) ? current.statusHistory : [];
+      const oldHistory = Array.isArray(current.statusHistory)
+        ? current.statusHistory
+        : [];
       const compatibilityHistory = [
         ...oldHistory,
         {
@@ -631,26 +861,39 @@ export class ServiceRequestsService {
         data: {
           status: legacyStatus as ServiceRequestStatus,
           statusHistory: compatibilityHistory,
-          ...(dto.finalPrice !== undefined ? { finalPrice: dto.finalPrice } : {}),
+          ...(dto.finalPrice !== undefined
+            ? { finalPrice: dto.finalPrice }
+            : {}),
           ...(nextStatus === 'COMPLETED' ? { paymentStatus: 'unpaid' } : {}),
           ...(dto.preferredDate ? { preferredDate: dto.preferredDate } : {}),
-          ...(dto.preferredTimeSlot ? { preferredTimeSlot: dto.preferredTimeSlot } : {}),
+          ...(dto.preferredTimeSlot
+            ? { preferredTimeSlot: dto.preferredTimeSlot }
+            : {}),
         },
       });
 
       const timestampUpdates: string[] = [];
-      if (nextStatus === 'CONFIRMED') timestampUpdates.push('confirmedAt = COALESCE(confirmedAt, NOW(3))');
-      if (nextStatus === 'ASSIGNED') timestampUpdates.push('assignedAt = COALESCE(assignedAt, NOW(3))');
-      if (nextStatus === 'IN_PROGRESS') timestampUpdates.push('startedAt = COALESCE(startedAt, NOW(3))');
-      if (nextStatus === 'COMPLETED') timestampUpdates.push('completedAt = COALESCE(completedAt, NOW(3))');
-      if (nextStatus === 'WARRANTY') timestampUpdates.push('warrantyStartedAt = COALESCE(warrantyStartedAt, NOW(3))');
-      if (nextStatus === 'CLOSED') timestampUpdates.push('closedAt = COALESCE(closedAt, NOW(3))');
+      if (nextStatus === 'CONFIRMED')
+        timestampUpdates.push('confirmedAt = COALESCE(confirmedAt, NOW(3))');
+      if (nextStatus === 'ASSIGNED')
+        timestampUpdates.push('assignedAt = COALESCE(assignedAt, NOW(3))');
+      if (nextStatus === 'IN_PROGRESS')
+        timestampUpdates.push('startedAt = COALESCE(startedAt, NOW(3))');
+      if (nextStatus === 'COMPLETED')
+        timestampUpdates.push('completedAt = COALESCE(completedAt, NOW(3))');
+      if (nextStatus === 'WARRANTY')
+        timestampUpdates.push(
+          'warrantyStartedAt = COALESCE(warrantyStartedAt, NOW(3))',
+        );
+      if (nextStatus === 'CLOSED')
+        timestampUpdates.push('closedAt = COALESCE(closedAt, NOW(3))');
       if (dto.preferredDate && dto.preferredTimeSlot) {
         timestampUpdates.push('scheduledAt = ?');
       }
-      const scheduledAt = dto.preferredDate && dto.preferredTimeSlot
-        ? this.parseScheduledAt(dto.preferredDate, dto.preferredTimeSlot)
-        : null;
+      const scheduledAt =
+        dto.preferredDate && dto.preferredTimeSlot
+          ? this.parseScheduledAt(dto.preferredDate, dto.preferredTimeSlot)
+          : null;
 
       await tx.$executeRawUnsafe(
         `UPDATE ServiceRequest
@@ -663,6 +906,30 @@ export class ServiceRequestsService {
         id,
       );
 
+      if (
+        nextStatus === 'RESCHEDULED' &&
+        dto.preferredDate &&
+        dto.preferredTimeSlot
+      ) {
+        await tx.$executeRawUnsafe(
+          `INSERT INTO ServiceRequestScheduleChange
+             (requestId, fromPreferredDate, fromPreferredTimeSlot,
+              toPreferredDate, toPreferredTimeSlot, reason, actorType, actorId,
+              fromRequestVersion, toRequestVersion, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3))`,
+          id,
+          current.preferredDate,
+          current.preferredTimeSlot,
+          dto.preferredDate,
+          dto.preferredTimeSlot,
+          dto.note?.trim() || 'Điều phối viên cập nhật lịch',
+          actor.actorType,
+          actor.actorId ?? null,
+          current.requestVersion,
+          current.requestVersion + 1,
+        );
+      }
+
       await this.writeStatusEvent(
         tx as PrismaService,
         id,
@@ -670,13 +937,24 @@ export class ServiceRequestsService {
         nextStatus,
         dto.note ?? null,
         actor,
-        dto.preferredDate ? { preferredDate: dto.preferredDate, preferredTimeSlot: dto.preferredTimeSlot } : undefined,
+        dto.preferredDate
+          ? {
+              preferredDate: dto.preferredDate,
+              preferredTimeSlot: dto.preferredTimeSlot,
+            }
+          : undefined,
       );
-      await this.writeAudit(tx as PrismaService, id, 'SERVICE_REQUEST_STATUS_CHANGED', actor, {
-        from: currentStatus,
-        to: nextStatus,
-        finalPrice: dto.finalPrice,
-      });
+      await this.writeAudit(
+        tx as PrismaService,
+        id,
+        'SERVICE_REQUEST_STATUS_CHANGED',
+        actor,
+        {
+          from: currentStatus,
+          to: nextStatus,
+          finalPrice: dto.finalPrice,
+        },
+      );
 
       if (nextStatus === 'COMPLETED' && current.assignedTechnicianId) {
         await tx.technician.update({
@@ -686,41 +964,108 @@ export class ServiceRequestsService {
       }
     });
 
-    if (TERMINAL_SERVICE_REQUEST_STATUSES.includes(nextStatus) || nextStatus === 'COMPLETED') {
+    if (
+      TERMINAL_SERVICE_REQUEST_STATUSES.includes(nextStatus) ||
+      nextStatus === 'COMPLETED'
+    ) {
       const row = await this.getRawRequest(id);
-      if (row?.assignedTechnicianId) await this.updateTechnicianAvailability(row.assignedTechnicianId, id);
+      if (row?.assignedTechnicianId)
+        await this.updateTechnicianAvailability(row.assignedTechnicianId, id);
+    }
+    const milestone = await this.getRawRequest(id);
+    if (milestone?.customerEmail) {
+      const titles: Partial<Record<ServiceRequestWorkflowStatus, string>> = {
+        CONFIRMED: 'Lịch dịch vụ đã được xác nhận',
+        RESCHEDULED: 'Lịch dịch vụ đã được cập nhật',
+        COMPLETED: 'Dịch vụ đã hoàn thành',
+        WARRANTY: 'Yêu cầu đã chuyển sang bảo hành',
+        CANCELLED: 'Yêu cầu dịch vụ đã hủy',
+      };
+      const title = titles[nextStatus];
+      if (title) {
+        void this.mailService
+          .sendServiceRequestMilestone(milestone.customerEmail, {
+            code: id,
+            title,
+            detail: dto.note?.trim() || `Trạng thái mới: ${nextStatus}`,
+          })
+          .catch(() => undefined);
+      }
     }
     return this.findOneAdmin(id);
   }
 
-  async assignTechnicianAdmin(id: string, dto: AssignTechnicianDto, actor: ServiceRequestActor) {
+  async assignTechnicianAdmin(
+    id: string,
+    dto: AssignTechnicianDto,
+    actor: ServiceRequestActor,
+  ) {
     await this.prisma.$transaction(async (tx) => {
-      const locked = await tx.$queryRawUnsafe<Array<{ workflowStatus: string; assignedTechnicianId: string | null; serviceCategoryId: string; district: string; statusHistory: unknown }>>(
-        'SELECT workflowStatus, assignedTechnicianId, serviceCategoryId, district, statusHistory FROM ServiceRequest WHERE id = ? FOR UPDATE',
+      const locked = await tx.$queryRawUnsafe<
+        Array<{
+          workflowStatus: string;
+          assignedTechnicianId: string | null;
+          serviceCategoryId: string;
+          district: string;
+          statusHistory: unknown;
+          requestVersion: number;
+        }>
+      >(
+        'SELECT workflowStatus, assignedTechnicianId, serviceCategoryId, district, statusHistory, requestVersion FROM ServiceRequest WHERE id = ? FOR UPDATE',
         id,
       );
       const request = locked[0];
-      if (!request || !isWorkflowStatus(request.workflowStatus)) throw new NotFoundException('Không tìm thấy yêu cầu dịch vụ');
-      if (!['CONFIRMED', 'RESCHEDULED', 'ASSIGNED'].includes(request.workflowStatus)) {
-        throw new BadRequestException('Chỉ được phân công yêu cầu đã xác nhận hoặc hẹn lại');
+      if (!request || !isWorkflowStatus(request.workflowStatus))
+        throw new NotFoundException('Không tìm thấy yêu cầu dịch vụ');
+      if (request.requestVersion !== dto.requestVersion) {
+        throw new ConflictException(
+          `Yêu cầu đã thay đổi (phiên bản hiện tại ${request.requestVersion}). Vui lòng tải lại.`,
+        );
+      }
+      if (
+        !['CONFIRMED', 'RESCHEDULED', 'ASSIGNED'].includes(
+          request.workflowStatus,
+        )
+      ) {
+        throw new BadRequestException(
+          'Chỉ được phân công yêu cầu đã xác nhận hoặc hẹn lại',
+        );
       }
 
-      const technician = await tx.technician.findUnique({ where: { id: dto.technicianId } });
-      if (!technician) throw new NotFoundException('Không tìm thấy kỹ thuật viên');
-      if (technician.status !== TechnicianStatus.available && request.assignedTechnicianId !== technician.id) {
-        throw new BadRequestException(`Kỹ thuật viên ${technician.name} hiện không sẵn sàng`);
+      const technician = await tx.technician.findUnique({
+        where: { id: dto.technicianId },
+      });
+      if (!technician)
+        throw new NotFoundException('Không tìm thấy kỹ thuật viên');
+      if (
+        technician.status !== TechnicianStatus.available &&
+        request.assignedTechnicianId !== technician.id
+      ) {
+        throw new BadRequestException(
+          `Kỹ thuật viên ${technician.name} hiện không sẵn sàng`,
+        );
       }
-      const skills = Array.isArray(technician.skills) ? technician.skills as string[] : [];
+      const skills = Array.isArray(technician.skills)
+        ? (technician.skills as string[])
+        : [];
       if (!skills.includes(request.serviceCategoryId)) {
-        throw new BadRequestException(`Kỹ thuật viên ${technician.name} chưa có kỹ năng phù hợp`);
+        throw new BadRequestException(
+          `Kỹ thuật viên ${technician.name} chưa có kỹ năng phù hợp`,
+        );
       }
-      const workingAreas = Array.isArray(technician.workingAreas) ? technician.workingAreas as string[] : [];
+      const workingAreas = Array.isArray(technician.workingAreas)
+        ? (technician.workingAreas as string[])
+        : [];
       if (!workingAreas.includes(request.district)) {
-        throw new BadRequestException(`Kỹ thuật viên ${technician.name} không phụ trách khu vực ${request.district}`);
+        throw new BadRequestException(
+          `Kỹ thuật viên ${technician.name} không phụ trách khu vực ${request.district}`,
+        );
       }
 
       const oldTechnicianId = request.assignedTechnicianId;
-      const oldHistory = Array.isArray(request.statusHistory) ? request.statusHistory : [];
+      const oldHistory = Array.isArray(request.statusHistory)
+        ? request.statusHistory
+        : [];
       await tx.serviceRequest.update({
         where: { id },
         data: {
@@ -744,7 +1089,10 @@ export class ServiceRequestsService {
          WHERE id = ?`,
         id,
       );
-      await tx.technician.update({ where: { id: technician.id }, data: { status: TechnicianStatus.busy } });
+      await tx.technician.update({
+        where: { id: technician.id },
+        data: { status: TechnicianStatus.busy },
+      });
       await this.writeStatusEvent(
         tx as PrismaService,
         id,
@@ -754,13 +1102,23 @@ export class ServiceRequestsService {
         actor,
         { technicianId: technician.id },
       );
-      await this.writeAudit(tx as PrismaService, id, 'SERVICE_REQUEST_ASSIGNED', actor, {
-        oldTechnicianId,
-        newTechnicianId: technician.id,
-      });
+      await this.writeAudit(
+        tx as PrismaService,
+        id,
+        'SERVICE_REQUEST_ASSIGNED',
+        actor,
+        {
+          oldTechnicianId,
+          newTechnicianId: technician.id,
+        },
+      );
 
       if (oldTechnicianId && oldTechnicianId !== technician.id) {
-        await this.updateTechnicianAvailability(oldTechnicianId, id, tx as PrismaService);
+        await this.updateTechnicianAvailability(
+          oldTechnicianId,
+          id,
+          tx as PrismaService,
+        );
       }
     });
     return this.findOneAdmin(id);
@@ -786,7 +1144,12 @@ export class ServiceRequestsService {
     );
     await client.technician.update({
       where: { id: technicianId },
-      data: { status: Number(active[0]?.total ?? 0) > 0 ? TechnicianStatus.busy : TechnicianStatus.available },
+      data: {
+        status:
+          Number(active[0]?.total ?? 0) > 0
+            ? TechnicianStatus.busy
+            : TechnicianStatus.available,
+      },
     });
   }
 
@@ -798,30 +1161,59 @@ export class ServiceRequestsService {
     phone?: string,
     caption?: string,
   ) {
-    if (!files?.length) throw new BadRequestException('Vui lòng chọn ít nhất một ảnh');
-    if (files.length > 5) throw new BadRequestException('Mỗi lần chỉ được tải tối đa 5 ảnh');
-    if (!SERVICE_REQUEST_MEDIA_STAGES.includes(requestedStage as ServiceRequestMediaStage)) {
+    if (!files?.length)
+      throw new BadRequestException('Vui lòng chọn ít nhất một ảnh');
+    if (files.length > 5)
+      throw new BadRequestException('Mỗi lần chỉ được tải tối đa 5 ảnh');
+    if (
+      !SERVICE_REQUEST_MEDIA_STAGES.includes(
+        requestedStage as ServiceRequestMediaStage,
+      )
+    ) {
       throw new BadRequestException('Giai đoạn hình ảnh không hợp lệ');
     }
 
-    const request = actor.actorType === 'CUSTOMER'
-      ? await this.getRawRequest(id, phone)
-      : await this.getRawRequest(id);
-    if (!request) throw new NotFoundException('Không tìm thấy yêu cầu với thông tin đã cung cấp');
+    const request =
+      actor.actorType === 'CUSTOMER'
+        ? await this.getRawRequest(id, phone)
+        : await this.getRawRequest(id);
+    if (!request)
+      throw new NotFoundException(
+        'Không tìm thấy yêu cầu với thông tin đã cung cấp',
+      );
 
-    const status = isWorkflowStatus(request.workflowStatus) ? request.workflowStatus : 'NEW';
-    if (actor.actorType === 'CUSTOMER' && !['NEW', 'CONFIRMED', 'RESCHEDULED'].includes(status)) {
-      throw new ForbiddenException('Không thể bổ sung ảnh khi yêu cầu đã bắt đầu xử lý');
+    const status = isWorkflowStatus(request.workflowStatus)
+      ? request.workflowStatus
+      : 'NEW';
+    if (
+      actor.actorType === 'CUSTOMER' &&
+      !['NEW', 'CONFIRMED', 'RESCHEDULED'].includes(status)
+    ) {
+      throw new ForbiddenException(
+        'Không thể bổ sung ảnh khi yêu cầu đã bắt đầu xử lý',
+      );
     }
-    const stage: ServiceRequestMediaStage = actor.actorType === 'CUSTOMER'
-      ? 'CUSTOMER_BEFORE'
-      : requestedStage as ServiceRequestMediaStage;
+    const stage: ServiceRequestMediaStage =
+      actor.actorType === 'CUSTOMER'
+        ? 'CUSTOMER_BEFORE'
+        : (requestedStage as ServiceRequestMediaStage);
 
-    const uploaded: Array<{ secure_url: string; public_id: string; resource_type: string; bytes?: number; width?: number; height?: number }> = [];
+    const uploaded: Array<{
+      secure_url: string;
+      public_id: string;
+      resource_type: string;
+      bytes?: number;
+      width?: number;
+      height?: number;
+    }> = [];
     try {
       for (const file of files) {
-        if (!file.mimetype.startsWith('image/')) throw new BadRequestException('Chỉ chấp nhận tệp hình ảnh');
-        const result = await this.cloudinaryService.uploadFile(file, `service-requests/${id.toLowerCase()}`);
+        if (!file.mimetype.startsWith('image/'))
+          throw new BadRequestException('Chỉ chấp nhận tệp hình ảnh');
+        const result = await this.cloudinaryService.uploadFile(
+          file,
+          `service-requests/${id.toLowerCase()}`,
+        );
         uploaded.push(result);
       }
 
@@ -847,16 +1239,32 @@ export class ServiceRequestsService {
             actor.actorId ?? null,
           );
         }
-        await this.writeAudit(tx as PrismaService, id, 'SERVICE_REQUEST_MEDIA_UPLOADED', actor, {
-          stage,
-          count: uploaded.length,
-        });
+        await this.writeAudit(
+          tx as PrismaService,
+          id,
+          'SERVICE_REQUEST_MEDIA_UPLOADED',
+          actor,
+          {
+            stage,
+            count: uploaded.length,
+          },
+        );
       });
     } catch (error) {
-      await Promise.all(uploaded.map((item) => this.cloudinaryService.deleteFile(item.public_id).catch(() => undefined)));
+      await Promise.all(
+        uploaded.map((item) =>
+          this.cloudinaryService
+            .deleteFile(item.public_id)
+            .catch(() => undefined),
+        ),
+      );
       throw error;
     }
 
-    return { success: true, message: 'Tải ảnh thành công', data: await this.getMedia(id) };
+    return {
+      success: true,
+      message: 'Tải ảnh thành công',
+      data: await this.getMedia(id),
+    };
   }
 }

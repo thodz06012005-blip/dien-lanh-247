@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CalendarDays, Clock3, Image as ImageIcon, MapPin, PhoneCall, ShieldAlert, Sparkles, Star, UserRound, Wrench } from 'lucide-react';
+import { ArrowLeft, Ban, CalendarClock, CalendarDays, Clock3, FileCheck2, FileText, Image as ImageIcon, MapPin, PhoneCall, ShieldAlert, ShieldCheck, Sparkles, Star, UserRound, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Breadcrumb from '@/components/common/Breadcrumb';
@@ -31,12 +31,18 @@ interface OwnerServiceRequest {
   paymentStatus: string;
   createdAt: string;
   updatedAt: string;
+  requestVersion: number;
   serviceCategoryName: string;
   technicianName?: string | null;
   technicianAvatar?: string | null;
   timeline: StatusHistoryEntry[];
   media: ServiceRequestMedia[];
   review?: { rating: number; comment?: string | null; createdAt: string; updatedAt: string } | null;
+  quotes: Array<{ id: string | number; quoteNumber: string; version: number; status: string; totalAmount: number; validUntil?: string | null; createdAt: string }>;
+  completion?: { reportNumber: string; diagnosis: string; workPerformed: string; recommendations?: string | null; customerConfirmedAt?: string | null; completedAt: string } | null;
+  warranties: Array<{ warrantyNumber: string; status: string; coverage: string; exclusions?: string | null; startsAt: string; endsAt: string }>;
+  scheduleChanges: Array<{ id: string | number; fromPreferredDate: string; fromPreferredTimeSlot: string; toPreferredDate: string; toPreferredTimeSlot: string; reason: string; createdAt: string }>;
+  selfServiceActions: { canReschedule: boolean; canCancel: boolean };
 }
 
 const statusLabels: Record<ServiceRequestStatus, string> = {
@@ -63,6 +69,10 @@ export default function MyServiceDetail() {
   const { showSuccess, showError } = useToastStore();
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+  const [action, setAction] = useState<'reschedule' | 'cancel' | null>(null);
+  const [preferredDate, setPreferredDate] = useState('');
+  const [preferredTimeSlot, setPreferredTimeSlot] = useState('');
+  const [reason, setReason] = useState('');
 
   const detailQuery = useQuery({
     queryKey: ['account-service-request', id],
@@ -73,6 +83,32 @@ export default function MyServiceDetail() {
   const reviewMutation = useMutation({
     mutationFn: () => api.post(`/account/service-requests/${id}/review`, { rating, comment: comment.trim() || undefined }),
     onSuccess: () => { showSuccess('Cảm ơn bạn đã đánh giá dịch vụ.'); void queryClient.invalidateQueries({ queryKey: ['account-service-request', id] }); },
+    onError: (error) => showError(getApiErrorMessage(error)),
+  });
+  const selfServiceMutation = useMutation({
+    mutationFn: async () => {
+      if (!request) throw new Error('Yêu cầu chưa sẵn sàng');
+      if (!reason.trim()) throw new Error('Vui lòng nhập lý do');
+      if (action === 'reschedule') {
+        if (!preferredDate || !preferredTimeSlot) throw new Error('Vui lòng chọn lịch mới');
+        return api.patch(`/account/service-requests/${id}/reschedule`, {
+          requestVersion: request.requestVersion,
+          preferredDate,
+          preferredTimeSlot,
+          reason: reason.trim(),
+        });
+      }
+      return api.post(`/account/service-requests/${id}/cancel`, {
+        requestVersion: request.requestVersion,
+        reason: reason.trim(),
+      });
+    },
+    onSuccess: () => {
+      showSuccess(action === 'reschedule' ? 'Đã gửi lịch mong muốn mới.' : 'Yêu cầu đã được hủy.');
+      setAction(null); setReason(''); setPreferredDate(''); setPreferredTimeSlot('');
+      void queryClient.invalidateQueries({ queryKey: ['account-service-request', id] });
+      void queryClient.invalidateQueries({ queryKey: ['account-service-requests'] });
+    },
     onError: (error) => showError(getApiErrorMessage(error)),
   });
 
@@ -90,12 +126,16 @@ export default function MyServiceDetail() {
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-6">
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-lg font-black text-slate-950">Thông tin dịch vụ</h2><div className="mt-5 grid gap-3 sm:grid-cols-2"><Info icon={UserRound} label="Khách hàng" value={request.customerName} /><Info icon={Wrench} label="Dịch vụ" value={`${request.serviceCategoryName} · ${request.applianceType}`} /><Info icon={MapPin} label="Địa chỉ" value={`${request.customerAddress}, ${request.district}`} /><Info icon={CalendarDays} label="Ngày mong muốn" value={request.preferredDate} /><Info icon={Clock3} label="Khung giờ" value={request.preferredTimeSlot} /><Info icon={Wrench} label="Kỹ thuật viên" value={request.technicianName || 'Chưa phân công'} /></div><div className="mt-4 rounded-2xl bg-slate-50 p-4"><span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Mô tả sự cố</span><p className="mt-2 text-sm leading-7 text-slate-600">{request.issueDescription}</p></div></section>
+            {(request.selfServiceActions.canReschedule || request.selfServiceActions.canCancel) && <section className="rounded-3xl border border-blue-200 bg-blue-50 p-5 sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-lg font-black text-blue-950">Bạn cần thay đổi?</h2><p className="mt-1 text-xs leading-5 text-blue-800">Chỉ tự đổi/hủy trước khi yêu cầu được phân công. Sau thời điểm đó, vui lòng gọi hotline.</p></div><div className="flex gap-2">{request.selfServiceActions.canReschedule && <Button variant="outline" onClick={() => setAction('reschedule')} leftIcon={<CalendarClock className="h-4 w-4" />}>Đổi lịch</Button>}{request.selfServiceActions.canCancel && <Button variant="outline" onClick={() => setAction('cancel')} leftIcon={<Ban className="h-4 w-4" />}>Hủy</Button>}</div></div>{action && <div className="mt-5 rounded-2xl bg-white p-4"><h3 className="font-black text-slate-900">{action === 'reschedule' ? 'Yêu cầu lịch mới' : 'Xác nhận hủy yêu cầu'}</h3>{action === 'reschedule' && <div className="mt-4 grid gap-3 sm:grid-cols-2"><input aria-label="Ngày mong muốn mới" type="date" value={preferredDate} onChange={(event) => setPreferredDate(event.target.value)} className="min-h-11 rounded-xl border border-slate-300 px-3 text-sm" /><select aria-label="Khung giờ mong muốn mới" value={preferredTimeSlot} onChange={(event) => setPreferredTimeSlot(event.target.value)} className="min-h-11 rounded-xl border border-slate-300 px-3 text-sm"><option value="">Chọn khung giờ</option>{['08:00 - 10:00', '10:00 - 12:00', '14:00 - 16:00', '16:00 - 18:00'].map((slot) => <option key={slot}>{slot}</option>)}</select></div>}<textarea value={reason} onChange={(event) => setReason(event.target.value)} className="mt-3 min-h-24 w-full rounded-xl border border-slate-300 p-3 text-sm" placeholder={action === 'cancel' ? 'Lý do hủy…' : 'Lý do đổi lịch…'} /><div className="mt-3 flex justify-end gap-2"><Button variant="outline" onClick={() => setAction(null)}>Đóng</Button><Button isLoading={selfServiceMutation.isPending} onClick={() => selfServiceMutation.mutate()}>{action === 'cancel' ? 'Xác nhận hủy' : 'Gửi lịch mới'}</Button></div></div>}</section>}
+            {request.quotes.length > 0 && <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary-600" /><h2 className="text-lg font-black text-slate-950">Các phiên bản báo giá</h2></div><div className="mt-4 space-y-3">{request.quotes.map((quote) => <div key={quote.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 p-4"><div><strong className="text-sm text-slate-900">{quote.quoteNumber} · Phiên bản {quote.version}</strong><span className="mt-1 block text-xs text-slate-500">{new Date(quote.createdAt).toLocaleString('vi-VN')} · {quote.status}</span></div><strong className="text-primary-700">{formatCurrency(quote.totalAmount)}</strong></div>)}</div></section>}
+            {request.completion && <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 sm:p-6"><div className="flex items-center gap-2"><FileCheck2 className="h-5 w-5 text-emerald-700" /><h2 className="text-lg font-black text-emerald-950">Biên bản nghiệm thu {request.completion.reportNumber}</h2></div><div className="mt-4 space-y-3 text-sm leading-6 text-emerald-950"><p><strong>Chẩn đoán:</strong> {request.completion.diagnosis}</p><p><strong>Công việc:</strong> {request.completion.workPerformed}</p>{request.completion.recommendations && <p><strong>Khuyến nghị:</strong> {request.completion.recommendations}</p>}</div></section>}
             {request.media.length > 0 && <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex items-center gap-2"><ImageIcon className="h-5 w-5 text-primary-600" /><h2 className="text-lg font-black text-slate-950">Ảnh trước và sau sửa chữa</h2></div><div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{request.media.map((item) => <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="overflow-hidden rounded-2xl border border-slate-200"><img src={item.url} alt={item.caption || 'Ảnh dịch vụ'} className="aspect-square w-full object-cover" /><div className="p-2 text-[10px] font-black text-slate-500">{item.stage.replaceAll('_', ' ')}</div></a>)}</div></section>}
             {canReview && <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-orange-500" /><h2 className="text-lg font-black text-slate-950">Đánh giá dịch vụ</h2></div>{request.review && <p className="mt-2 text-sm text-emerald-700">Bạn đã đánh giá {request.review.rating}/5 sao. Có thể cập nhật lại bất cứ lúc nào.</p>}<div className="mt-5 flex gap-2">{[1, 2, 3, 4, 5].map((value) => <button type="button" key={value} onClick={() => setRating(value)} className="rounded-xl p-2 hover:bg-orange-50" aria-label={`${value} sao`}><Star className={`h-6 w-6 ${value <= rating ? 'fill-orange-400 text-orange-400' : 'text-slate-300'}`} /></button>)}</div><textarea value={comment} onChange={(event) => setComment(event.target.value)} className="mt-4 min-h-28 w-full rounded-2xl border border-slate-200 p-4 text-sm outline-none focus:border-primary-500 focus:ring-4 focus:ring-blue-100" placeholder={request.review?.comment || 'Chia sẻ trải nghiệm của bạn...'} /><div className="mt-4 flex justify-end"><Button isLoading={reviewMutation.isPending} onClick={() => reviewMutation.mutate()}>Gửi đánh giá</Button></div></section>}
           </div>
           <div className="space-y-6">
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-lg font-black text-slate-950">Tiến độ xử lý</h2><div className="mt-5">{request.timeline.map((event, index) => <div key={event.id} className="relative flex gap-4 pb-6 last:pb-0"><div className="relative z-10 mt-1 h-3 w-3 shrink-0 rounded-full bg-primary-500 ring-4 ring-primary-50" />{index < request.timeline.length - 1 && <div className="absolute left-[5px] top-4 h-full w-px bg-slate-200" />}<div><strong className="text-sm text-slate-900">{statusLabels[event.toStatus]}</strong><p className="mt-1 text-[10px] text-slate-400">{new Date(event.createdAt).toLocaleString('vi-VN')}</p>{event.note && <p className="mt-2 text-xs leading-5 text-slate-500">{event.note}</p>}</div></div>)}</div></section>
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-lg font-black text-slate-950">Chi phí</h2><div className="mt-4 space-y-3 text-sm"><div className="flex justify-between"><span className="text-slate-500">Ước tính</span><strong>{request.estimatedPrice > 0 ? formatCurrency(request.estimatedPrice) : 'Chờ báo giá'}</strong></div><div className="flex justify-between border-t border-slate-100 pt-3"><span className="text-slate-500">Thực tế</span><strong className="text-primary-700">{request.finalPrice > 0 ? formatCurrency(request.finalPrice) : 'Chưa có'}</strong></div></div></section>
+            {request.warranties.length > 0 && <section className="rounded-3xl border border-violet-200 bg-violet-50 p-5 sm:p-6"><div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-violet-700" /><h2 className="text-lg font-black text-violet-950">Bảo hành</h2></div><div className="mt-4 space-y-3">{request.warranties.map((warranty) => <div key={warranty.warrantyNumber} className="rounded-2xl bg-white/70 p-4 text-sm"><strong className="text-violet-950">{warranty.warrantyNumber} · {warranty.status}</strong><p className="mt-2 leading-6 text-violet-900">{warranty.coverage}</p><span className="mt-2 block text-xs text-violet-700">{new Date(warranty.startsAt).toLocaleDateString('vi-VN')} – {new Date(warranty.endsAt).toLocaleDateString('vi-VN')}</span></div>)}</div></section>}
           </div>
         </div>
       </div>

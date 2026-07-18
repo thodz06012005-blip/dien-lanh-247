@@ -17,6 +17,8 @@ import {
   AddressDto,
   ChangePasswordDto,
   ClaimServiceRequestDto,
+  CustomerCancelServiceRequestDto,
+  CustomerRescheduleServiceRequestDto,
   ServiceRequestReviewDto,
   UpdateProfileDto,
 } from './dto/account.dto';
@@ -39,8 +41,13 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  async overview(@CurrentUser() user: AccountUser): Promise<AccountApiResponse> {
-    return { success: true, data: await this.usersService.getOverview(user.userId) };
+  async overview(
+    @CurrentUser() user: AccountUser,
+  ): Promise<AccountApiResponse> {
+    return {
+      success: true,
+      data: await this.usersService.getOverview(user.userId),
+    };
   }
 
   @Patch('profile')
@@ -56,8 +63,13 @@ export class UsersController {
   }
 
   @Get('addresses')
-  async addresses(@CurrentUser() user: AccountUser): Promise<AccountApiResponse> {
-    return { success: true, data: await this.usersService.listAddresses(user.userId) };
+  async addresses(
+    @CurrentUser() user: AccountUser,
+  ): Promise<AccountApiResponse> {
+    return {
+      success: true,
+      data: await this.usersService.listAddresses(user.userId),
+    };
   }
 
   @Post('addresses')
@@ -114,8 +126,13 @@ export class UsersController {
   }
 
   @Get('service-requests')
-  async serviceRequests(@CurrentUser() user: AccountUser): Promise<AccountApiResponse> {
-    return { success: true, data: await this.usersService.listServiceRequests(user.userId) };
+  async serviceRequests(
+    @CurrentUser() user: AccountUser,
+  ): Promise<AccountApiResponse> {
+    return {
+      success: true,
+      data: await this.usersService.listServiceRequests(user.userId),
+    };
   }
 
   @Get('service-requests/:id')
@@ -123,7 +140,10 @@ export class UsersController {
     @CurrentUser() user: AccountUser,
     @Param('id') id: string,
   ): Promise<AccountApiResponse> {
-    return { success: true, data: await this.usersService.getServiceRequest(user.userId, id) };
+    return {
+      success: true,
+      data: await this.usersService.getServiceRequest(user.userId, id),
+    };
   }
 
   @Post('service-requests/claim')
@@ -151,14 +171,54 @@ export class UsersController {
     };
   }
 
+  @Patch('service-requests/:id/reschedule')
+  async rescheduleServiceRequest(
+    @CurrentUser() user: AccountUser,
+    @Param('id') id: string,
+    @Body() dto: CustomerRescheduleServiceRequestDto,
+  ): Promise<AccountApiResponse> {
+    return {
+      success: true,
+      message: 'Đã gửi lịch mong muốn mới; điều phối viên sẽ xác nhận lại.',
+      data: await this.usersService.rescheduleServiceRequest(
+        user.userId,
+        id,
+        dto,
+      ),
+    };
+  }
+
+  @Post('service-requests/:id/cancel')
+  async cancelServiceRequest(
+    @CurrentUser() user: AccountUser,
+    @Param('id') id: string,
+    @Body() dto: CustomerCancelServiceRequestDto,
+  ): Promise<AccountApiResponse> {
+    return {
+      success: true,
+      message: 'Yêu cầu đã được hủy.',
+      data: await this.usersService.cancelServiceRequest(user.userId, id, dto),
+    };
+  }
+
   @Get('notifications')
-  async notifications(@CurrentUser() user: AccountUser): Promise<AccountApiResponse> {
-    return { success: true, data: await this.usersService.listNotifications(user.userId) };
+  async notifications(
+    @CurrentUser() user: AccountUser,
+  ): Promise<AccountApiResponse> {
+    return {
+      success: true,
+      data: await this.usersService.listNotifications(user.userId),
+    };
   }
 
   @Patch('notifications/read-all')
-  async readAllNotifications(@CurrentUser() user: AccountUser): Promise<AccountApiResponse> {
-    return { success: true, data: await this.usersService.markAllNotificationsRead(user.userId) };
+  async readAllNotifications(
+    @CurrentUser() user: AccountUser,
+  ): Promise<AccountApiResponse> {
+    return {
+      success: true,
+      data: await this.usersService.markAllNotificationsRead(user.userId),
+    };
   }
 
   @Patch('notifications/:id/read')
@@ -166,11 +226,19 @@ export class UsersController {
     @CurrentUser() user: AccountUser,
     @Param('id') id: string,
   ): Promise<AccountApiResponse> {
-    return { success: true, data: await this.usersService.markNotificationRead(user.userId, BigInt(id)) };
+    return {
+      success: true,
+      data: await this.usersService.markNotificationRead(
+        user.userId,
+        BigInt(id),
+      ),
+    };
   }
 
   @Get('sessions')
-  async sessions(@CurrentUser() user: AccountUser): Promise<AccountApiResponse> {
+  async sessions(
+    @CurrentUser() user: AccountUser,
+  ): Promise<AccountApiResponse> {
     return {
       success: true,
       data: await this.usersService.listSessions(user.userId, user.sessionId),
@@ -184,7 +252,10 @@ export class UsersController {
   ): Promise<AccountApiResponse> {
     return {
       success: true,
-      message: id === user.sessionId ? 'Phiên hiện tại đã được thu hồi' : 'Phiên đăng nhập đã được thu hồi',
+      message:
+        id === user.sessionId
+          ? 'Phiên hiện tại đã được thu hồi'
+          : 'Phiên đăng nhập đã được thu hồi',
       data: await this.usersService.revokeSession(user.userId, id),
     };
   }

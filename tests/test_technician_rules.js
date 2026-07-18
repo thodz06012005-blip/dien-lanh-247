@@ -40,6 +40,14 @@ function request(method, path, body = null, token = null) {
   });
 }
 
+async function patchStatus(id, body, token) {
+  const current = await request('GET', `/api/v1/admin/service-requests/${id}`, null, token);
+  return request('PATCH', `/api/v1/admin/service-requests/${id}/status`, {
+    requestVersion: current.data?.data?.requestVersion || 1,
+    ...body
+  }, token);
+}
+
 async function runTests() {
   console.log('=== Running Technician Validation & Constraints Tests ===');
 
@@ -235,7 +243,7 @@ async function runTests() {
 
   // Complete SR-240601
   console.log('Completing SR-240601...');
-  await request('PATCH', `/api/v1/admin/service-requests/SR-240601/status`, { status: 'completed', finalPrice: 200000 }, token);
+  await patchStatus('SR-240601', { status: 'completed', finalPrice: 200000 }, token);
 
   // Check TECH-001: completedCount should increase, status should be 'available'
   const res14 = await request('GET', '/api/v1/admin/technicians', null, token);
@@ -257,15 +265,17 @@ async function runTests() {
     applianceType: 'Điều hòa',
     issueDescription: 'Vệ sinh máy',
     preferredDate: '2026-07-10',
-    preferredTimeSlot: '10:00 - 12:00'
+    preferredTimeSlot: '10:00 - 12:00',
+    pricingDisclosureAccepted: true,
+    pricingDisclosureVersion: '2026-07-v1'
   });
   const sr3Id = newSrRes.data.data.id;
-  await request('PATCH', `/api/v1/admin/service-requests/${sr3Id}/status`, { status: 'confirmed' }, token);
+  await patchStatus(sr3Id, { status: 'confirmed' }, token);
   await request('PATCH', `/api/v1/admin/service-requests/${sr3Id}/assign-technician`, { technicianId: 'TECH-001' }, token);
   
   // Cancel SR-3
   console.log('Cancelling SR-3...');
-  await request('PATCH', `/api/v1/admin/service-requests/${sr3Id}/status`, { status: 'cancelled' }, token);
+  await patchStatus(sr3Id, { status: 'cancelled' }, token);
 
   // Check TECH-001: status should be 'available'
   const res14b = await request('GET', '/api/v1/admin/technicians', null, token);
@@ -294,10 +304,12 @@ async function runTests() {
     applianceType: 'Điều hòa',
     issueDescription: 'Vệ sinh máy',
     preferredDate: '2026-07-10',
-    preferredTimeSlot: '10:00 - 12:00'
+    preferredTimeSlot: '10:00 - 12:00',
+    pricingDisclosureAccepted: true,
+    pricingDisclosureVersion: '2026-07-v1'
   });
   const sr4Id = newSrRes2.data.data.id;
-  await request('PATCH', `/api/v1/admin/service-requests/${sr4Id}/status`, { status: 'confirmed' }, token);
+  await patchStatus(sr4Id, { status: 'confirmed' }, token);
 
   console.log('Assigning TECH-001 to SR-240601...');
   await request('PATCH', `/api/v1/admin/service-requests/SR-240601/assign-technician`, { technicianId: 'TECH-001' }, token);

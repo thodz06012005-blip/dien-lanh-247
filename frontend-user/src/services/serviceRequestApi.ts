@@ -14,14 +14,18 @@ export interface CreateServiceRequestPayload {
   preferredDate: string;
   preferredTimeSlot: string;
   note?: string;
+  pricingDisclosureAccepted: true;
+  pricingDisclosureVersion: '2026-07-v1';
 }
 
-export async function createServiceRequest(payload: CreateServiceRequestPayload) {
-  const response = await api.post('/service-requests', payload);
+export async function createServiceRequest(payload: CreateServiceRequestPayload, idempotencyKey: string) {
+  const response = await api.post('/service-requests', payload, {
+    headers: { 'Idempotency-Key': idempotencyKey },
+  });
   return response.data as {
     success: true;
     message: string;
-    data: { id: string; code: string; status: 'NEW'; confirmationSent: boolean };
+    data: { id: string; code: string; status: 'NEW'; confirmationSent: boolean; replayed: boolean };
   };
 }
 

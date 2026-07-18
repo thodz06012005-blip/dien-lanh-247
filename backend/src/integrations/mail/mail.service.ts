@@ -6,7 +6,12 @@ export class MailService {
   constructor(private readonly mailerService: MailerService) {}
 
   // Never print reset/verification links or tokens to logs
-  private async deliver(to: string, subject: string, text: string, html?: string) {
+  private async deliver(
+    to: string,
+    subject: string,
+    text: string,
+    html?: string,
+  ) {
     if (!process.env.MAIL_HOST && !process.env.SMTP_HOST) {
       console.log(`[MailService] Simulated email: ${subject} -> ${to}`);
       return { delivered: false, simulated: true };
@@ -41,6 +46,24 @@ export class MailService {
       'Bạn có thể dùng mã yêu cầu và số điện thoại đã đăng ký để tra cứu trạng thái.',
     ].join('\n');
     return this.deliver(email, subject, text);
+  }
+
+  async sendServiceRequestMilestone(
+    email: string,
+    request: { code: string; title: string; detail: string },
+  ) {
+    return this.deliver(
+      email,
+      `${request.title} · ${request.code}`,
+      [
+        request.title,
+        '',
+        `Mã yêu cầu: ${request.code}`,
+        request.detail,
+        '',
+        'Bạn có thể đăng nhập Account Hub để xem dòng thời gian, báo giá, nghiệm thu và bảo hành.',
+      ].join('\n'),
+    );
   }
 
   async sendPasswordReset(email: string, resetUrl: string) {

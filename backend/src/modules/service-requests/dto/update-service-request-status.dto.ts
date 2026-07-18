@@ -1,9 +1,25 @@
-import { IsISO8601, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsISO8601,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { SERVICE_REQUEST_STATUSES } from '../service-request-workflow';
 
 export class UpdateServiceRequestStatusDto {
+  @IsInt({ message: 'Phiên bản yêu cầu phải là số nguyên' })
+  @Min(1, { message: 'Phiên bản yêu cầu không hợp lệ' })
+  requestVersion: number;
+
   @IsString()
-  @IsIn(SERVICE_REQUEST_STATUSES, { message: 'Trạng thái yêu cầu dịch vụ không hợp lệ' })
+  @IsIn(SERVICE_REQUEST_STATUSES, {
+    message: 'Trạng thái yêu cầu dịch vụ không hợp lệ',
+  })
   @IsNotEmpty({ message: 'Trạng thái yêu cầu dịch vụ không được để trống' })
   status: string;
 

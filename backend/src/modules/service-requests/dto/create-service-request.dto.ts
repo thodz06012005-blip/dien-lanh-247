@@ -1,4 +1,6 @@
 import {
+  Equals,
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsISO8601,
@@ -19,7 +21,9 @@ export class CreateServiceRequestDto {
 
   @IsString()
   @IsNotEmpty({ message: 'Số điện thoại là bắt buộc' })
-  @Matches(/^(?:\+?84|0)(?:3|5|7|8|9)\d{8}$/, { message: 'Số điện thoại Việt Nam không hợp lệ' })
+  @Matches(/^(?:\+?84|0)(?:3|5|7|8|9)\d{8}$/, {
+    message: 'Số điện thoại Việt Nam không hợp lệ',
+  })
   customerPhone: string;
 
   @IsEmail({}, { message: 'Email không hợp lệ' })
@@ -67,6 +71,14 @@ export class CreateServiceRequestDto {
   @IsOptional()
   @MaxLength(2000)
   note?: string;
+
+  @IsBoolean()
+  @Equals(true, { message: 'Bạn cần xác nhận đã hiểu giá chỉ là tham khảo' })
+  pricingDisclosureAccepted: boolean;
+
+  @IsString()
+  @Matches(/^2026-07-v1$/, { message: 'Phiên bản thông tin giá không hợp lệ' })
+  pricingDisclosureVersion: string;
 
   // Legacy JSON image URLs remain accepted for backward compatibility.
   @IsOptional()
