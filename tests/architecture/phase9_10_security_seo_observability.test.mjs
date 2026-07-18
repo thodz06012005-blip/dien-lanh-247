@@ -99,6 +99,7 @@ test('Phase 10 keeps Web Vitals budgets and privacy-safe observability', () => {
   const adminReporter = read('frontend-admin/src/observability/errorReporter.ts');
   const logging = read('backend/src/common/interceptors/request-logging.interceptor.ts');
   const monitor = read('scripts/monitor-health.mjs');
+  const performanceCss = read('frontend-user/src/styles/phase13-performance.css');
   for (const metric of ['LCP', 'CLS', 'INP']) assert.match(vitals, new RegExp(metric));
   assert.match(lighthouse, /audit_route booking \/service-booking mobile/);
   for (const reporter of [customerReporter, adminReporter]) {
@@ -110,4 +111,5 @@ test('Phase 10 keeps Web Vitals budgets and privacy-safe observability', () => {
   assert.match(logging, /traceId/);
   assert.match(logging, /deploymentEnvironment/);
   assert.match(monitor, /ALERT_WEBHOOK_URL/);
+  assert.match(performanceCss, /data-image-key='home\.hero'/);
 });
