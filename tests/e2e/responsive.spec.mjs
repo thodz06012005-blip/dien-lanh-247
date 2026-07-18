@@ -8,6 +8,9 @@ const customerPages = [
   ['services', '/services'],
   ['legacy-products-redirect', '/products', '/services'],
   ['service-booking', '/service-booking'],
+  ['faq', '/faq'],
+  ['policy-booking', '/policy/booking'],
+  ['policy-cookies', '/policy/cookies'],
   ['login', '/login'],
 ];
 
@@ -92,6 +95,24 @@ test('customer home supports keyboard navigation', async ({ page }) => {
   await expect(skipLink).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.locator('#main-content')).toBeFocused();
+});
+
+test('customer public pages expose accessible names and service CTAs', async ({ page }) => {
+  await installMockApiBridge(page, `${userBase}/faq`);
+  await page.goto(`${userBase}/faq`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+  await expect(page.getByRole('searchbox', { name: 'Tìm trong câu hỏi thường gặp' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Gọi ngay/i })).toBeVisible();
+
+  const unnamedImages = await page.locator('img').evaluateAll((images) =>
+    images.filter((image) => !image.hasAttribute('alt')).length,
+  );
+  expect(unnamedImages).toBe(0);
+
+  await page.goto(`${userBase}/policy/booking`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByText('DL247-SVC-1.0')).toBeVisible();
+  await expect(page.getByText('01/08/2026')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Tra cứu yêu cầu' }).first()).toBeVisible();
 });
 
 test('admin login remains usable', async ({ page }, testInfo) => {

@@ -40,7 +40,7 @@ export default function Articles() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {posts.map((post) => (
             <article key={post.id} className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
-              <OptimizedImage src={post.coverUrl || 'https://images.unsplash.com/photo-1508514177221-188b1cf16e9d'} alt={post.coverAlt || post.title} width={800} height={520} sizes="(max-width: 768px) 100vw, 33vw" className="aspect-[16/10] w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
+              <OptimizedImage src={post.coverUrl} alt={post.coverAlt || post.title} assetKey="article.cover" width={800} height={520} sizes="(max-width: 768px) 100vw, 33vw" className="aspect-[16/10] w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
               <div className="p-6">
                 <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-500"><span className="rounded-full bg-blue-50 px-2.5 py-1 font-bold text-blue-700">{post.categoryName || 'Kiến thức'}</span><span className="inline-flex items-center gap-1"><CalendarDays className="h-4 w-4" />{formatDate(post.publishedAt)}</span></div>
                 <h2 className="mt-4 text-xl font-black text-slate-950">{post.title}</h2>

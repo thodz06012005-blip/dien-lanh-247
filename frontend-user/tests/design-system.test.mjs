@@ -24,6 +24,7 @@ test('customer design system exposes required reusable components', () => {
     'Card',
     'Breadcrumb',
     'Pagination',
+    'ResponsiveTable',
     'DesignSystemToastProvider',
   ];
 

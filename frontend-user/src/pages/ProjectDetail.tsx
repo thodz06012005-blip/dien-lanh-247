@@ -34,7 +34,7 @@ export default function ProjectDetail() {
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4"><dt className="flex items-center gap-2 text-slate-400"><CalendarDays className="h-4 w-4" />Hoàn thành</dt><dd className="mt-2 font-bold text-white">{formatDate(project.completedAt)}</dd></div>
               </dl>
             </div>
-            <OptimizedImage src={project.coverUrl || 'https://images.unsplash.com/photo-1497366754035-f200968a6e72'} alt={project.coverAlt || project.title} width={1200} height={900} priority className="min-h-[360px] h-full w-full object-cover" />
+            <OptimizedImage src={project.coverUrl} alt={project.coverAlt || project.title} assetKey="project.cover" width={1200} height={900} priority className="min-h-[360px] h-full w-full object-cover" />
           </div>
         </div>
 

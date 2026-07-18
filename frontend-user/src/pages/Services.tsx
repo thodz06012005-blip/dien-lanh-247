@@ -75,8 +75,9 @@ export default function Services() {
           {items.map((service) => (
             <article key={service.id} className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
               <OptimizedImage
-                src={service.coverUrl || 'https://images.unsplash.com/photo-1621905252507-b354bc25edac'}
+                src={service.coverUrl}
                 alt={service.coverAlt || service.title}
+                assetKey="service.card"
                 width={720}
                 height={450}
                 sizes="(max-width: 768px) 100vw, 33vw"

@@ -33,13 +33,19 @@ const fallbackCompanyLinks: FooterLink[] = [
   { label: 'Giới thiệu', to: '/about' },
   { label: 'Dự án tiêu biểu', to: '/projects' },
   { label: 'Bài viết kiến thức', to: '/articles' },
+  { label: 'Câu hỏi thường gặp', to: '/faq' },
   { label: 'Liên hệ', to: '/contact' },
 ];
 const fallbackPolicyLinks: FooterLink[] = [
+  { label: 'Điều khoản website', to: '/policy/terms' },
+  { label: 'Đặt lịch dịch vụ', to: '/policy/booking' },
+  { label: 'Hủy và đổi lịch', to: '/policy/cancellation' },
+  { label: 'Báo giá và chi phí', to: '/policy/pricing' },
+  { label: 'Thanh toán dịch vụ', to: '/policy/payment' },
   { label: 'Chính sách bảo hành', to: '/policy/warranty' },
+  { label: 'Tiếp nhận khiếu nại', to: '/policy/complaints' },
   { label: 'Chính sách bảo mật', to: '/policy/privacy' },
-  { label: 'Điều khoản sử dụng', to: '/policy/terms' },
-  { label: 'Thanh toán', to: '/policy/payment' },
+  { label: 'Cookie', to: '/policy/cookies' },
 ];
 
 function section(bundle: SiteSectionContent[] | undefined, keys: string[]) {
@@ -56,7 +62,14 @@ function safeLinks(value: unknown, fallback: FooterLink[]) {
   return selected.filter(
     (item) => !/^\/(?:products|cart|checkout|orders)(?:\/|\?|$)/.test(item.to)
       && !/^\/policy\/(?:shipping|returns)(?:\/|\?|$)/.test(item.to),
+  ).filter(
+    (item) => !/\b(?:sản phẩm|giỏ hàng|đơn hàng|giao hàng|đổi trả|mua hàng|bán lẻ|retail)\b/i.test(item.label),
   );
+}
+
+function safeServiceDescription(value: string | undefined, fallback: string) {
+  if (!value || /\b(?:sản phẩm|giỏ hàng|đơn hàng|giao hàng|đổi trả|mua hàng|bán lẻ|retail)\b/i.test(value)) return fallback;
+  return value;
 }
 
 function FooterLinks({ title, links }: { title: string; links: FooterLink[] }) {
@@ -104,13 +117,11 @@ export default function Footer() {
   const zalo = contactConfig.zalo || config.zalo || settings?.zalo || hotline;
   const email = contactConfig.email || config.email || settings?.email || 'support@dienlanh247.vn';
   const address = contactConfig.address || config.address || settings?.address || 'Cầu Giấy, Hà Nội';
-  const description =
-    footerSection?.content ||
-    config.description ||
-    'Nền tảng dịch vụ điện lạnh cho gia đình và doanh nghiệp, tập trung vào điều phối rõ ràng, báo giá minh bạch và theo dõi bảo hành.';
+  const descriptionFallback = 'Nền tảng dịch vụ điện lạnh cho gia đình và doanh nghiệp, tập trung vào điều phối rõ ràng, báo giá minh bạch và theo dõi bảo hành.';
+  const description = safeServiceDescription(footerSection?.content || config.description, descriptionFallback);
   const serviceLinks = safeLinks(config.serviceLinks, fallbackServiceLinks);
   const companyLinks = safeLinks(config.companyLinks, fallbackCompanyLinks);
-  const policyLinks = safeLinks(config.policyLinks, fallbackPolicyLinks);
+  const policyLinks = fallbackPolicyLinks;
 
   return (
     <footer className="mt-auto border-t border-slate-900 bg-[#020b14] text-slate-300">
@@ -181,10 +192,10 @@ export default function Footer() {
             <FooterLinks title="Chính sách" links={policyLinks} />
             <div className="mt-7">
               <Link
-                to="/my-services"
+                to="/service-lookup"
                 className="block rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-black text-white hover:bg-white/10"
               >
-                Lịch sửa chữa
+                Tra cứu yêu cầu
               </Link>
             </div>
           </div>

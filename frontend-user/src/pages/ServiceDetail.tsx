@@ -33,7 +33,7 @@ export default function ServiceDetail() {
               <Link to="/contact" className="inline-flex min-h-12 items-center rounded-xl border border-slate-300 px-5 text-sm font-black text-slate-800">Nhận tư vấn</Link>
             </div>
           </div>
-          <OptimizedImage src={service.coverUrl || 'https://images.unsplash.com/photo-1621905252507-b354bc25edac'} alt={service.coverAlt || service.title} width={1000} height={720} priority className="aspect-[4/3] w-full rounded-[2rem] object-cover shadow-2xl" />
+          <OptimizedImage src={service.coverUrl} alt={service.coverAlt || service.title} assetKey="service.detail" width={1000} height={720} priority className="aspect-[4/3] w-full rounded-[2rem] object-cover shadow-2xl" />
         </div>
 
         <div className="mt-16 grid gap-8 lg:grid-cols-[1fr_320px]">

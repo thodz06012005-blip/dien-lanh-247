@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingBag } from 'lucide-react';
+import { Inbox } from 'lucide-react';
 import Button from '../ui/Button';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,7 +13,7 @@ interface EmptyStateProps {
 }
 
 export default function EmptyState({
-  icon = <ShoppingBag className="w-16 h-16 text-slate-300" />,
+  icon = <Inbox aria-hidden="true" className="h-16 w-16 text-slate-300" />,
   title = 'Danh sách trống',
   description = 'Không tìm thấy dữ liệu nào phù hợp hoặc danh sách hiện tại đang trống.',
   actionText,
@@ -31,7 +31,7 @@ export default function EmptyState({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center text-center p-12 bg-white rounded-3xl border border-slate-100/80 shadow-sm max-w-md mx-auto my-6">
+    <section role="status" className="mx-auto my-6 flex max-w-md flex-col items-center justify-center rounded-3xl border border-slate-100/80 bg-white p-8 text-center shadow-sm sm:p-12">
       <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
         {icon}
       </div>
@@ -44,6 +44,6 @@ export default function EmptyState({
           {actionText}
         </Button>
       )}
-    </div>
+    </section>
   );
 }

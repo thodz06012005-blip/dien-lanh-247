@@ -13,6 +13,7 @@ const About = lazy(() => import('@/pages/About'));
 const Account = lazy(() => import('@/pages/Account'));
 const ArticleDetail = lazy(() => import('@/pages/ArticleDetail'));
 const Contact = lazy(() => import('@/pages/Contact'));
+const Faq = lazy(() => import('@/pages/Faq'));
 const DesignSystem = lazy(() => import('@/pages/DesignSystem'));
 const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
 const Login = lazy(() => import('@/pages/Login'));
@@ -124,6 +125,7 @@ export default function AppRouter() {
             <Route path="articles/:slug" element={<ArticleDetail />} />
             <Route path="about" element={<About />} />
             <Route path="contact" element={<Contact />} />
+            <Route path="faq" element={<Faq />} />
             <Route path="policy/shipping" element={<Navigate to="/policy/terms" replace />} />
             <Route path="policy/return" element={<Navigate to="/policy/warranty" replace />} />
             <Route path="policy/returns" element={<Navigate to="/policy/warranty" replace />} />

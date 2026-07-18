@@ -15,7 +15,7 @@ export interface StaticService {
 export interface StaticProject {
   slug: string;
   title: string;
-  category: 'Nhà ở' | 'Văn phòng' | 'Nhà hàng' | 'Bán lẻ';
+  category: 'Nhà ở' | 'Văn phòng' | 'Nhà hàng' | 'Thương mại & dịch vụ';
   location: string;
   completedAt: string;
   summary: string;
@@ -175,15 +175,15 @@ export const projects: StaticProject[] = [
     ],
   },
   {
-    slug: 'showroom-north-star',
-    title: 'Lắp đặt điều hòa showroom North Star',
-    category: 'Bán lẻ',
+    slug: 'trung-tam-dich-vu-north-star',
+    title: 'Lắp đặt điều hòa trung tâm dịch vụ North Star',
+    category: 'Thương mại & dịch vụ',
     location: 'Hai Bà Trưng, Hà Nội',
     completedAt: 'Tháng 02/2026',
-    summary: 'Thiết kế hệ thống làm mát thẩm mỹ, hạn chế lộ đường ống và phù hợp lưu lượng khách theo giờ.',
-    challenge: 'Không gian trưng bày yêu cầu thẩm mỹ cao, trần kỹ thuật thấp và mặt kính nhận nhiều bức xạ nhiệt.',
+    summary: 'Thiết kế hệ thống làm mát thẩm mỹ, hạn chế lộ đường ống và phù hợp lưu lượng người sử dụng theo giờ.',
+    challenge: 'Không gian tiếp khách yêu cầu thẩm mỹ cao, trần kỹ thuật thấp và mặt kính nhận nhiều bức xạ nhiệt.',
     solution: 'Tính tải lạnh, bố trí luồng gió tránh thổi trực tiếp vào khách và thi công đường ống theo trục nội thất.',
-    result: 'Showroom đạt nhiệt độ mục tiêu, giữ được thiết kế nội thất và vận hành êm trong giờ đông khách.',
+    result: 'Khu vực dịch vụ đạt nhiệt độ mục tiêu, giữ được thiết kế nội thất và vận hành êm trong giờ cao điểm.',
     image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8',
     gallery: [
       'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04',

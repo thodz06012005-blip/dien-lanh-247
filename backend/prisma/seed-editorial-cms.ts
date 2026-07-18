@@ -173,8 +173,18 @@ async function main() {
     {
       copyright: `© ${new Date().getFullYear()} Điện Lạnh 247. Mọi quyền được bảo lưu.`,
       serviceLinks: [{ label: 'Tất cả dịch vụ', to: '/services' }, { label: 'Đặt lịch kỹ thuật', to: '/service-booking' }],
-      companyLinks: [{ label: 'Giới thiệu', to: '/about' }, { label: 'Dự án', to: '/projects' }, { label: 'Bài viết', to: '/articles' }],
-      policyLinks: [{ label: 'Bảo hành', to: '/policy/warranty' }, { label: 'Bảo mật', to: '/policy/privacy' }, { label: 'Điều khoản', to: '/policy/terms' }],
+      companyLinks: [{ label: 'Giới thiệu', to: '/about' }, { label: 'Dự án', to: '/projects' }, { label: 'Bài viết', to: '/articles' }, { label: 'Câu hỏi thường gặp', to: '/faq' }],
+      policyLinks: [
+        { label: 'Điều khoản website', to: '/policy/terms' },
+        { label: 'Đặt lịch dịch vụ', to: '/policy/booking' },
+        { label: 'Hủy và đổi lịch', to: '/policy/cancellation' },
+        { label: 'Báo giá và chi phí', to: '/policy/pricing' },
+        { label: 'Thanh toán dịch vụ', to: '/policy/payment' },
+        { label: 'Bảo hành', to: '/policy/warranty' },
+        { label: 'Khiếu nại', to: '/policy/complaints' },
+        { label: 'Bảo mật', to: '/policy/privacy' },
+        { label: 'Cookie', to: '/policy/cookies' },
+      ],
     },
     admin.id,
   );

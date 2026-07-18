@@ -87,8 +87,7 @@ export default function Contact() {
           <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
             <div className="relative aspect-[16/10] overflow-hidden">
               <OptimizedImage
-                src="https://images.unsplash.com/photo-1524661135-423995f22d0b"
-                alt="Bản đồ khu vực phục vụ"
+                assetKey="contact.service-area"
                 width={900}
                 height={560}
                 sizes="(max-width: 1024px) 100vw, 45vw"
