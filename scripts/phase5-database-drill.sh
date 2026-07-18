@@ -20,6 +20,12 @@ BACKUP_DIR="$(mktemp -d)"
 
 mysql_cmd=(mysql --host "$MYSQL_HOST" --port "$MYSQL_PORT" --user "$MYSQL_USER" --default-character-set=utf8mb4)
 
+database_url() {
+  local database_name="$1"
+  printf '%s://%s:%s@%s:%s/%s' \
+    "mysql" "$MYSQL_USER" "$MYSQL_PASSWORD" "$MYSQL_HOST" "$MYSQL_PORT" "$database_name"
+}
+
 cleanup() {
   if [[ -d "$HELD_MIGRATION" && ! -d "$MIGRATION_DIR" ]]; then
     mv "$HELD_MIGRATION" "$MIGRATION_DIR"
@@ -30,7 +36,7 @@ trap cleanup EXIT
 "${mysql_cmd[@]}" -e "DROP DATABASE IF EXISTS phase5_clean; CREATE DATABASE phase5_clean CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 (
   cd "$ROOT_DIR/backend"
-  DATABASE_URL="mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/phase5_clean" npx prisma migrate deploy
+  DATABASE_URL="$(database_url phase5_clean)" npx prisma migrate deploy
 )
 
 clean_metadata="$("${mysql_cmd[@]}" --batch --skip-column-names phase5_clean -e "SELECT COUNT(*) FROM LegacyDomainMetadata;")"
@@ -42,7 +48,7 @@ mv "$MIGRATION_DIR" "$HELD_MIGRATION"
 "${mysql_cmd[@]}" -e "DROP DATABASE IF EXISTS phase5_legacy; CREATE DATABASE phase5_legacy CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 (
   cd "$ROOT_DIR/backend"
-  DATABASE_URL="mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/phase5_legacy" npx prisma migrate deploy
+  DATABASE_URL="$(database_url phase5_legacy)" npx prisma migrate deploy
 )
 
 "${mysql_cmd[@]}" phase5_legacy <<'SQL'
@@ -57,7 +63,7 @@ SQL
 
 (
   cd "$ROOT_DIR"
-  DATABASE_URL="mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/phase5_legacy" \
+  DATABASE_URL="$(database_url phase5_legacy)" \
   BACKUP_DIRECTORY="$BACKUP_DIR" BACKUP_RETENTION_DAYS=1 node scripts/backup-mysql.mjs
 )
 BACKUP_FILE="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name '*.sql.gz' -print -quit)"
@@ -66,7 +72,7 @@ BACKUP_FILE="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name '*.sql.gz' -print -q
 "${mysql_cmd[@]}" -e "DROP DATABASE IF EXISTS phase5_restore; CREATE DATABASE phase5_restore CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 (
   cd "$ROOT_DIR"
-  DATABASE_URL="mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/phase5_restore" \
+  DATABASE_URL="$(database_url phase5_restore)" \
   BACKUP_DIRECTORY="$BACKUP_DIR" RESTORE_FILE="$BACKUP_FILE" RESTORE_CONFIRM=phase5_restore \
   node scripts/restore-mysql.mjs
 )
@@ -74,7 +80,7 @@ BACKUP_FILE="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name '*.sql.gz' -print -q
 mv "$HELD_MIGRATION" "$MIGRATION_DIR"
 (
   cd "$ROOT_DIR/backend"
-  DATABASE_URL="mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/phase5_restore" npx prisma migrate deploy
+  DATABASE_URL="$(database_url phase5_restore)" npx prisma migrate deploy
 )
 
 legacy_products="$("${mysql_cmd[@]}" --batch --skip-column-names phase5_restore -e "SELECT COUNT(*) FROM Product WHERE slug='legacy-rollback-fixture';")"
