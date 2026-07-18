@@ -23,6 +23,9 @@ let refreshPromise: Promise<AdminSessionPayload> | null = null;
 
 api.interceptors.request.use((config) => {
   if (!config.headers.has('X-Request-Id')) config.headers.set('X-Request-Id', createRequestId());
+  if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() ?? '')) {
+    config.headers.set('X-CSRF-Protection', '1');
+  }
   if (config.method?.toLowerCase() === 'delete') config.headers.set('X-Confirm-Dangerous-Action', 'true');
   return config;
 });
@@ -30,7 +33,7 @@ api.interceptors.request.use((config) => {
 async function refreshAdminSession() {
   if (!refreshPromise) {
     refreshPromise = axios
-      .post(`${env.apiBaseUrl}/admin/auth/refresh`, {}, { withCredentials: true, timeout: env.apiTimeoutMs })
+      .post(`${env.apiBaseUrl}/admin/auth/refresh`, {}, { withCredentials: true, timeout: env.apiTimeoutMs, headers: { 'X-CSRF-Protection': '1' } })
       .then(async (response) => {
         const payload = response.data.data as AdminSessionPayload;
         const { useAdminAuthStore } = await import('@/store/adminAuthStore');

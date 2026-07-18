@@ -7,7 +7,6 @@ on:
     paths:
       - 'frontend-user/**'
       - 'backend/src/modules/content/**'
-      - 'backend/src/modules/products/**'
       - 'tests/architecture/phase13-*'
       - 'scripts/verify-customer-build-budget.mjs'
       - '.github/workflows/phase13-quality.yml'
@@ -15,7 +14,6 @@ on:
     paths:
       - 'frontend-user/**'
       - 'backend/src/modules/content/**'
-      - 'backend/src/modules/products/**'
       - 'tests/architecture/phase13-*'
       - 'scripts/verify-customer-build-budget.mjs'
       - '.github/workflows/phase13-quality.yml'

@@ -44,6 +44,7 @@ const dynamicSources = [
   { endpoint: '/projects', route: '/projects', priority: '0.7', changefreq: 'monthly' },
   { endpoint: '/posts', route: '/articles', priority: '0.7', changefreq: 'weekly' },
 ];
+const FORBIDDEN_COMMERCE_ROUTE = /^\/(?:products?|cart|checkout|orders?|inventory|shipping|returns?|coupons?|promotions?)(?:\/|$)/i;
 
 function escapeXml(value) {
   return String(value)
@@ -110,10 +111,13 @@ async function buildEntries() {
     try {
       const records = await fetchAll(source);
       for (const record of records) {
+        if (record?.status && String(record.status).toUpperCase() !== 'PUBLISHED') continue;
         const identifier = record?.slug || record?.id;
         if (!identifier) continue;
+        const publicPath = `${source.route}/${encodeURIComponent(String(identifier))}`;
+        if (FORBIDDEN_COMMERCE_ROUTE.test(publicPath)) continue;
         entries.push({
-          path: `${source.route}/${encodeURIComponent(String(identifier))}`,
+          path: publicPath,
           changefreq: source.changefreq,
           priority: source.priority,
           lastmod: toIsoDate(record.updatedAt || record.publishedAt || record.createdAt),
@@ -133,7 +137,9 @@ async function buildEntries() {
 
 function render(entries) {
   const unique = new Map();
-  for (const entry of entries) unique.set(entry.path, entry);
+  for (const entry of entries) {
+    if (!FORBIDDEN_COMMERCE_ROUTE.test(entry.path)) unique.set(entry.path, entry);
+  }
   const urls = [...unique.values()]
     .sort((left, right) => left.path.localeCompare(right.path))
     .map((entry) => {

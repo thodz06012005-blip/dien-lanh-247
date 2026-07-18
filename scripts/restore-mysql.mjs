@@ -1,8 +1,11 @@
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createDecipheriv, createHash } from 'node:crypto';
 import {
+  closeSync,
   createReadStream,
   existsSync,
+  openSync,
+  readSync,
   readFileSync,
   realpathSync,
   statSync,
@@ -27,6 +30,19 @@ function safeDecode(value) {
 
 function sha256(filePath) {
   return createHash('sha256').update(readFileSync(filePath)).digest('hex');
+}
+
+function backupEncryptionKey(requiredForRestore = false) {
+  const value = process.env.BACKUP_ENCRYPTION_KEY?.trim();
+  if (!value) {
+    if (requiredForRestore) throw new Error('BACKUP_ENCRYPTION_KEY is required for encrypted restore.');
+    return null;
+  }
+  const key = /^[a-f0-9]{64}$/i.test(value)
+    ? Buffer.from(value, 'hex')
+    : Buffer.from(value, 'base64');
+  if (key.length !== 32) throw new Error('BACKUP_ENCRYPTION_KEY must decode to exactly 32 bytes.');
+  return key;
 }
 
 const databaseUrl = new URL(required('DATABASE_URL'));
@@ -54,8 +70,11 @@ const relative = path.relative(backupDirectory, restoreFile);
 if (relative.startsWith('..') || path.isAbsolute(relative)) {
   throw new Error('RESTORE_FILE must be inside BACKUP_DIRECTORY.');
 }
-if (!restoreFile.endsWith('.sql.gz') || !statSync(restoreFile).isFile()) {
-  throw new Error('RESTORE_FILE must be a readable .sql.gz backup.');
+if (!/\.sql\.gz(?:\.enc)?$/.test(restoreFile) || !statSync(restoreFile).isFile()) {
+  throw new Error('RESTORE_FILE must be a readable .sql.gz or .sql.gz.enc backup.');
+}
+if (process.env.NODE_ENV === 'production' && !restoreFile.endsWith('.enc')) {
+  throw new Error('Production restore requires an encrypted .sql.gz.enc backup.');
 }
 
 const checksumFile = `${restoreFile}.sha256`;
@@ -102,9 +121,31 @@ const exitPromise = new Promise((resolve, reject) => {
   });
 });
 
-await Promise.all([
-  pipeline(createReadStream(restoreFile), createGunzip(), mysql.stdin),
-  exitPromise,
-]);
+const sourceStreams = [];
+if (restoreFile.endsWith('.enc')) {
+  const key = backupEncryptionKey(true);
+  const magic = Buffer.alloc(9);
+  const iv = Buffer.alloc(12);
+  const fileSize = statSync(restoreFile).size;
+  const authTag = Buffer.alloc(16);
+  const descriptor = openSync(restoreFile, 'r');
+  readSync(descriptor, magic, 0, magic.length, 0);
+  readSync(descriptor, iv, 0, iv.length, magic.length);
+  readSync(descriptor, authTag, 0, authTag.length, fileSize - authTag.length);
+  closeSync(descriptor);
+  if (magic.toString('ascii') !== 'DL247BKP1' || fileSize <= 37) {
+    throw new Error('Encrypted backup header is invalid.');
+  }
+  const decipher = createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(authTag);
+  sourceStreams.push(
+    createReadStream(restoreFile, { start: 21, end: fileSize - 17 }),
+    decipher,
+  );
+} else {
+  sourceStreams.push(createReadStream(restoreFile));
+}
+
+await Promise.all([pipeline(...sourceStreams, createGunzip(), mysql.stdin), exitPromise]);
 
 console.log(`Restore completed and checksum verified for database: ${databaseName}`);

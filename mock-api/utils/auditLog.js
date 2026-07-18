@@ -3,7 +3,12 @@ const { readDB, writeDB } = require('./db');
 const MAX_LOGS = Number(process.env.AUDIT_LOG_MAX_ENTRIES) || 1000;
 
 const sanitizeValue = (key, val) => {
-  if (typeof key === 'string' && /password|hash|token|cookie|authorization/i.test(key)) {
+  if (
+    typeof key === 'string' &&
+    /password|hash|token|cookie|authorization|address|street|district|ward|province|phone|email|image|photo|media|attachment|latitude|longitude/i.test(
+      key,
+    )
+  ) {
     return '[REDACTED]';
   }
   return val;

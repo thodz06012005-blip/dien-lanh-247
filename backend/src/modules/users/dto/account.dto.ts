@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsInt,
+  IsIn,
   IsISO8601,
   IsNotEmpty,
   IsOptional,
@@ -144,4 +145,14 @@ export class ServiceRequestReviewDto {
   @IsString()
   @MaxLength(2000)
   comment?: string;
+}
+
+export class PersonalDataRequestDto {
+  @IsIn(['ACCESS', 'RECTIFY', 'DELETE', 'RESTRICT'])
+  requestType: 'ACCESS' | 'RECTIFY' | 'DELETE' | 'RESTRICT';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }

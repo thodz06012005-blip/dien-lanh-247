@@ -140,9 +140,23 @@ export function validateEnvironment(
     fallback: jwtAccessSecret,
   });
   const serviceOnlyMode = readBoolean(source, 'SERVICE_ONLY_MODE', true);
+  const datasetClassification = readEnum(
+    source,
+    'DATASET_CLASSIFICATION',
+    ['synthetic', 'staging', 'production'] as const,
+    nodeEnvironment === 'production' ? 'production' : 'synthetic',
+  );
 
   if (nodeEnvironment === 'production' && !serviceOnlyMode) {
     throw new Error('SERVICE_ONLY_MODE must be true in production.');
+  }
+  if (
+    nodeEnvironment !== 'production' &&
+    datasetClassification === 'production'
+  ) {
+    throw new Error(
+      'Production customer data must not be used in local, test or staging environments.',
+    );
   }
 
   if (nodeEnvironment === 'staging' || nodeEnvironment === 'production') {
@@ -291,5 +305,6 @@ export function validateEnvironment(
     ),
     SOFT_DELETE_ENABLED: readBoolean(source, 'SOFT_DELETE_ENABLED', true),
     SERVICE_ONLY_MODE: serviceOnlyMode,
+    DATASET_CLASSIFICATION: datasetClassification,
   };
 }

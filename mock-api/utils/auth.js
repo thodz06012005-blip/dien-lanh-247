@@ -58,6 +58,7 @@ const adminUsers = [
 ];
 
 const adminSessions = [];
+const adminStepUpSessions = [];
 
 // ================================================================
 // PERMISSION MAP
@@ -188,19 +189,18 @@ const parseCookies = (cookieHeader) => {
   return list;
 };
 
+const getAdminRequestToken = (req) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) return authHeader.split(' ')[1];
+  return parseCookies(req.headers.cookie).accessToken || null;
+};
+
 // ================================================================
 // MIDDLEWARE: requireAdminAuth
 // Verifies the session cookie / bearer token and attaches req.admin.
 // ================================================================
 const requireAdminAuth = (req, res, next) => {
-  let token = null;
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.split(' ')[1];
-  } else if (req.headers.cookie) {
-    const cookies = parseCookies(req.headers.cookie);
-    token = cookies['accessToken'];
-  }
+  const token = getAdminRequestToken(req);
 
   if (!token) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -223,6 +223,55 @@ const requireAdminAuth = (req, res, next) => {
   // Strip password from req.admin — never expose credentials to route handlers
   const { password: _, ...adminSafe } = adminRaw;
   req.admin = { ...adminSafe, permissions: getUiPermissions(adminSafe.role) };
+  req.adminSession = session;
+  next();
+};
+
+const issueAdminStepUp = (adminId, sessionToken) => {
+  const token = 'admin_step_up_' + require('crypto').randomBytes(16).toString('hex');
+  adminStepUpSessions.push({
+    token,
+    adminId,
+    sessionToken,
+    expiresAt: Date.now() + 5 * 60 * 1000,
+  });
+  return token;
+};
+
+const revokeAdminStepUps = (adminId, sessionToken = null) => {
+  for (let index = adminStepUpSessions.length - 1; index >= 0; index -= 1) {
+    const stepUp = adminStepUpSessions[index];
+    if (stepUp.adminId === adminId && (!sessionToken || stepUp.sessionToken === sessionToken)) {
+      adminStepUpSessions.splice(index, 1);
+    }
+  }
+};
+
+const requireSuperAdminStepUp = (req, res, next) => {
+  const token = parseCookies(req.headers.cookie).adminStepUpToken;
+  const accessToken = getAdminRequestToken(req);
+  const stepUp = adminStepUpSessions.find((entry) => entry.token === token);
+  const valid =
+    req.admin?.role === 'superadmin' &&
+    stepUp?.adminId === req.admin.id &&
+    stepUp?.sessionToken === accessToken &&
+    stepUp.expiresAt > Date.now();
+  if (!valid) {
+    const { auditDenied } = require('./auditLog');
+    auditDenied(
+      req,
+      'SUPERADMIN_STEP_UP_REQUIRED',
+      req.baseUrl + req.path,
+      req.admin?.id || 'none',
+      null,
+      'Fresh Super Admin verification required',
+    );
+    return res.status(403).json({
+      success: false,
+      code: 'SUPERADMIN_STEP_UP_REQUIRED',
+      message: 'Vui lòng xác minh lại mật khẩu Super Admin trước thao tác nhạy cảm.',
+    });
+  }
   next();
 };
 
@@ -266,6 +315,7 @@ const requireDevOnly = (req, res, next) => {
 module.exports = {
   adminUsers,
   adminSessions,
+  adminStepUpSessions,
   requireAdminAuth,
   requirePermission,
   hasPermission,
@@ -273,6 +323,10 @@ module.exports = {
   UI_ROLE_PERMISSIONS,
   getUiPermissions,
   parseCookies,
+  getAdminRequestToken,
+  issueAdminStepUp,
+  revokeAdminStepUps,
+  requireSuperAdminStepUp,
   isProduction,
   isDevFeatureEnabled,
   isDemoAccountsEnabled,

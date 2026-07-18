@@ -1,9 +1,11 @@
 const SENSITIVE_KEY_PATTERN =
-  /password|passwd|pwd|secret|token|authorization|cookie|session|private.?key|api.?key|card.?number|pan|cvv|cvc|pin|otp/i;
+  /password|passwd|pwd|secret|token|authorization|cookie|session|private.?key|api.?key|card.?number|pan|cvv|cvc|pin|otp|address|street|district|ward|province|phone|email|image|photo|media|attachment|latitude|longitude/i;
 
 const BEARER_PATTERN = /\bBearer\s+[-A-Za-z0-9._~+\x2f]+=*/gi;
-const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g;
-const PRIVATE_KEY_PATTERN = /-----BEGIN(?: [A-Z]+)? PRIVATE KEY-----[\s\S]*?-----END(?: [A-Z]+)? PRIVATE KEY-----/g;
+const JWT_PATTERN =
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g;
+const PRIVATE_KEY_PATTERN =
+  /-----BEGIN(?: [A-Z]+)? PRIVATE KEY-----[\s\S]*?-----END(?: [A-Z]+)? PRIVATE KEY-----/g;
 
 function luhnCheck(value: string) {
   const digits = value.replace(/\D/g, '');

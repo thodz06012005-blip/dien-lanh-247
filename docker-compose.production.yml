@@ -44,6 +44,7 @@ services:
       ENABLE_DEMO_ACCOUNTS: 'false'
       AUDIT_LOG_PATH: /app/var/audit/security-audit.jsonl
       BACKUP_DIRECTORY: /app/var/backups
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:?BACKUP_ENCRYPTION_KEY is required}
     depends_on:
       db:
         condition: service_healthy

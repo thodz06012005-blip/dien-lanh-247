@@ -4,6 +4,9 @@ import { ErrorCode } from '../constants/error-codes';
 import type { RequestWithContext } from './request-context.middleware';
 
 const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH']);
+const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const AUTH_COOKIE_PATTERN =
+  /(?:^|;\s*)(?:accessToken|refreshToken|adminAccessToken|adminRefreshToken)=/;
 const ALLOWED_CONTENT_TYPES = [
   'application/json',
   'application/x-www-form-urlencoded',
@@ -26,7 +29,10 @@ export function helmetSecurityMiddleware(
   response.setHeader('X-Download-Options', 'noopen');
   response.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
   response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  response.setHeader(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), payment=()',
+  );
   response.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   response.setHeader('Cross-Origin-Resource-Policy', 'same-site');
   response.setHeader('Origin-Agent-Cluster', '?1');
@@ -47,6 +53,44 @@ export function helmetSecurityMiddleware(
 
 // Backward-compatible export for older imports.
 export const securityHeadersMiddleware = helmetSecurityMiddleware;
+
+/**
+ * Cookie-authenticated browser writes must come from an allowed origin and
+ * include a non-simple header. Requests without browser origin metadata remain
+ * available to trusted CLI/health integrations and are still authenticated.
+ */
+export function csrfProtectionMiddleware(allowedOrigins: readonly string[]) {
+  const allowlist = new Set(allowedOrigins);
+  return (request: Request, response: Response, next: NextFunction) => {
+    if (!STATE_CHANGING_METHODS.has(request.method)) return next();
+    if (!AUTH_COOKIE_PATTERN.test(request.headers.cookie ?? '')) return next();
+
+    const origin = request.headers.origin;
+    const fetchSite = request.headers['sec-fetch-site'];
+    const browserRequest = Boolean(origin || fetchSite);
+    if (!browserRequest) return next();
+
+    const sameSite = fetchSite === 'same-origin' || fetchSite === 'same-site';
+    const allowedOrigin = Boolean(origin && allowlist.has(origin));
+    const explicitProtection = request.header('x-csrf-protection') === '1';
+    if ((sameSite || allowedOrigin) && explicitProtection) return next();
+
+    const requestWithContext = request as RequestWithContext;
+    return response.status(HttpStatus.FORBIDDEN).json({
+      success: false,
+      statusCode: HttpStatus.FORBIDDEN,
+      message: 'Yêu cầu thay đổi trạng thái không vượt qua kiểm tra CSRF.',
+      error: {
+        code: 'CSRF_VALIDATION_FAILED',
+        message: 'Yêu cầu thay đổi trạng thái không vượt qua kiểm tra CSRF.',
+      },
+      requestId: requestWithContext.requestId ?? 'unknown',
+      timestamp: new Date().toISOString(),
+      method: request.method,
+      path: request.path,
+    });
+  };
+}
 
 export function contentTypeGuardMiddleware(
   request: Request,

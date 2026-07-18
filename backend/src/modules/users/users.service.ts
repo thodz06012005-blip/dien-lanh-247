@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../core/database/prisma.service';
 import { MailService } from '../../integrations/mail/mail.service';
 import { AuthService } from '../auth/auth.service';
@@ -17,6 +18,7 @@ import {
   ClaimServiceRequestDto,
   CustomerCancelServiceRequestDto,
   CustomerRescheduleServiceRequestDto,
+  PersonalDataRequestDto,
   ServiceRequestReviewDto,
   UpdateProfileDto,
 } from './dto/account.dto';
@@ -738,6 +740,61 @@ export class UsersService {
       ...row,
       current: row.id === currentSessionId,
     }));
+  }
+
+  async exportPersonalData(userId: number) {
+    const account = this.safeAccount(await this.getAccountRow(userId));
+    const [addresses, serviceRequests] = await Promise.all([
+      this.listAddresses(userId),
+      this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+        `SELECT id, applianceType, issueDescription, preferredDate, preferredTimeSlot,
+                workflowStatus, requestVersion, createdAt, updatedAt, completedAt,
+                warrantyStartedAt, closedAt
+         FROM ServiceRequest WHERE customerUserId = ? ORDER BY createdAt DESC`,
+        userId,
+      ),
+    ]);
+    return {
+      generatedAt: new Date().toISOString(),
+      scope: ['account', 'addresses', 'serviceRequests'],
+      account,
+      addresses,
+      serviceRequests,
+    };
+  }
+
+  async listPersonalDataRequests(userId: number) {
+    await this.getAccountRow(userId);
+    return this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+      `SELECT id, requestType, status, reason, requestedAt, dueAt, completedAt
+       FROM PersonalDataRequest WHERE userId = ? ORDER BY requestedAt DESC`,
+      userId,
+    );
+  }
+
+  async createPersonalDataRequest(userId: number, dto: PersonalDataRequestDto) {
+    await this.getAccountRow(userId);
+    const existing = await this.prisma.$queryRawUnsafe<Array<{ id: string }>>(
+      `SELECT id FROM PersonalDataRequest
+       WHERE userId = ? AND requestType = ? AND status IN ('RECEIVED', 'VERIFYING', 'IN_PROGRESS')
+       LIMIT 1`,
+      userId,
+      dto.requestType,
+    );
+    if (existing[0]) {
+      throw new ConflictException('Một yêu cầu cùng loại đang được xử lý.');
+    }
+    const id = randomUUID();
+    await this.prisma.$executeRawUnsafe(
+      `INSERT INTO PersonalDataRequest
+        (id, userId, requestType, status, reason, requestedAt, dueAt, createdAt, updatedAt)
+       VALUES (?, ?, ?, 'RECEIVED', ?, NOW(3), DATE_ADD(NOW(3), INTERVAL 20 DAY), NOW(3), NOW(3))`,
+      id,
+      userId,
+      dto.requestType,
+      dto.reason?.trim() || null,
+    );
+    return { id, requestType: dto.requestType, status: 'RECEIVED' };
   }
 
   async revokeSession(userId: number, sessionId: string) {

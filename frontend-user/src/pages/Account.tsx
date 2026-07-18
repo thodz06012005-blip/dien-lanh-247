@@ -3,6 +3,8 @@ import {
   Bell,
   CheckCircle2,
   ChevronRight,
+  Database,
+  Download,
   KeyRound,
   Laptop,
   Link2,
@@ -26,11 +28,14 @@ import {
   changePassword,
   claimServiceRequest,
   createAddress,
+  createPersonalDataRequest,
   deleteAddress,
   getAccountOverview,
+  exportPersonalData,
   listAccountServiceRequests,
   listAddresses,
   listNotifications,
+  listPersonalDataRequests,
   listSessions,
   markAllNotificationsRead,
   markNotificationRead,
@@ -40,6 +45,7 @@ import {
   type AccountOverview,
   type AccountSession,
   type Address,
+  type PersonalDataRequest,
 } from '@/services/accountApi';
 import api, { getApiErrorMessage } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
@@ -99,6 +105,7 @@ export default function Account() {
   const servicesQuery = useQuery({ queryKey: ['account-services'], queryFn: listAccountServiceRequests, enabled: activeTab === 'services' || activeTab === 'overview' });
   const notificationsQuery = useQuery({ queryKey: ['account-notifications'], queryFn: listNotifications, enabled: activeTab === 'notifications' || activeTab === 'overview' });
   const sessionsQuery = useQuery({ queryKey: ['account-sessions'], queryFn: listSessions, enabled: activeTab === 'security' || activeTab === 'overview' });
+  const privacyRequestsQuery = useQuery({ queryKey: ['account-privacy-requests'], queryFn: listPersonalDataRequests, enabled: activeTab === 'security' });
 
   useEffect(() => {
     const current = overviewQuery.data?.user ?? user;
@@ -156,6 +163,27 @@ export default function Account() {
     },
     onError: (error) => showError(getApiErrorMessage(error)),
   });
+  const privacyRequestMutation = useMutation({
+    mutationFn: () => createPersonalDataRequest({ requestType: 'DELETE', reason: 'Yêu cầu xóa hoặc ẩn danh dữ liệu không còn nghĩa vụ lưu trữ.' }),
+    onSuccess: () => { void privacyRequestsQuery.refetch(); showSuccess('Đã tiếp nhận yêu cầu xóa dữ liệu để xác minh.'); },
+    onError: (error) => showError(getApiErrorMessage(error)),
+  });
+
+  const handlePrivacyExport = async () => {
+    try {
+      const payload = await exportPersonalData();
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `dien-lanh-247-du-lieu-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showSuccess('Đã tạo bản sao dữ liệu cá nhân.');
+    } catch (error) {
+      showError(getApiErrorMessage(error));
+    }
+  };
 
   const account = overviewQuery.data;
   const accountUser = account?.user ?? user;
@@ -214,7 +242,7 @@ export default function Account() {
           {activeTab === 'addresses' && <AddressesTab addresses={addressesQuery.data || []} form={addressForm} setForm={setAddressForm} addPending={addressMutation.isPending} deletePending={deleteAddressMutation.isPending} onAdd={() => addressMutation.mutate()} onDelete={(id) => deleteAddressMutation.mutate(id)} />}
           {activeTab === 'services' && <ServicesTab requests={(servicesQuery.data || []) as AccountServiceRequest[]} claim={claim} setClaim={setClaim} pending={claimMutation.isPending} onClaim={() => claimMutation.mutate()} onOpen={(id) => navigate(`/my-services/${id}`)} />}
           {activeTab === 'notifications' && <NotificationsTab notifications={notifications} onRead={async (id) => { await markNotificationRead(id); void notificationsQuery.refetch(); refreshAccount(); }} onReadAll={async () => { await markAllNotificationsRead(); void notificationsQuery.refetch(); refreshAccount(); }} />}
-          {activeTab === 'security' && <SecurityTab password={password} setPassword={setPassword} sessions={sessionsQuery.data || []} passwordPending={passwordMutation.isPending} revokePending={revokeMutation.isPending} onPassword={() => { if (password.newPassword !== password.confirmPassword) { showError('Mật khẩu xác nhận không khớp'); return; } passwordMutation.mutate(); }} onRevoke={(session) => revokeMutation.mutate(session)} />}
+          {activeTab === 'security' && <SecurityTab password={password} setPassword={setPassword} sessions={sessionsQuery.data || []} privacyRequests={privacyRequestsQuery.data || []} passwordPending={passwordMutation.isPending} revokePending={revokeMutation.isPending} privacyPending={privacyRequestMutation.isPending} onPassword={() => { if (password.newPassword !== password.confirmPassword) { showError('Mật khẩu xác nhận không khớp'); return; } passwordMutation.mutate(); }} onRevoke={(session) => revokeMutation.mutate(session)} onExport={() => void handlePrivacyExport()} onDeleteRequest={() => privacyRequestMutation.mutate()} />}
         </main>
       </div>
     </div>
@@ -258,6 +286,6 @@ function NotificationsTab({ notifications, onRead, onReadAll }: { notifications:
   return <Panel title="Thông báo" subtitle="Cập nhật tài khoản, dịch vụ và bảo mật theo thời gian thực."><div className="mb-5 flex justify-end"><Button variant="outline" onClick={() => void onReadAll()}>Đánh dấu đã đọc tất cả</Button></div><div className="space-y-3">{notifications.map((notification) => <button type="button" key={String(notification.id)} onClick={() => { if (!notification.readAt) void onRead(notification.id); }} className={`w-full rounded-2xl border p-5 text-left ${notification.readAt ? 'border-slate-200 bg-white' : 'border-blue-100 bg-blue-50/70'}`}><strong className="text-sm text-slate-950">{notification.title}</strong><p className="mt-1 text-sm leading-6 text-slate-600">{notification.body}</p><span className="mt-2 block text-xs text-slate-400">{formatDate(notification.createdAt)}</span></button>)}{!notifications.length && <Empty icon={Bell} title="Không có thông báo" body="Thông báo mới sẽ xuất hiện tại đây." />}</div></Panel>;
 }
 
-function SecurityTab({ password, setPassword, sessions, passwordPending, revokePending, onPassword, onRevoke }: { password: { currentPassword: string; newPassword: string; confirmPassword: string }; setPassword: (value: { currentPassword: string; newPassword: string; confirmPassword: string }) => void; sessions: AccountSession[]; passwordPending: boolean; revokePending: boolean; onPassword: () => void; onRevoke: (session: AccountSession) => void }) {
-  return <div className="space-y-6"><Panel title="Thay đổi mật khẩu" subtitle="Sau khi đổi, tất cả phiên đăng nhập sẽ bị thu hồi."><div className="grid gap-4 sm:grid-cols-3"><Input label="Mật khẩu hiện tại" type="password" value={password.currentPassword} onChange={(e) => setPassword({ ...password, currentPassword: e.target.value })} /><Input label="Mật khẩu mới" type="password" value={password.newPassword} onChange={(e) => setPassword({ ...password, newPassword: e.target.value })} /><Input label="Xác nhận mật khẩu" type="password" value={password.confirmPassword} onChange={(e) => setPassword({ ...password, confirmPassword: e.target.value })} /></div><div className="mt-5 flex justify-end"><Button leftIcon={<KeyRound className="h-4 w-4" />} isLoading={passwordPending} onClick={onPassword}>Đổi mật khẩu</Button></div></Panel><Panel title="Thiết bị đang đăng nhập" subtitle="Thu hồi bất kỳ phiên nào bạn không nhận ra."><div className="space-y-3">{sessions.map((session) => <div key={session.id} className="flex flex-col gap-4 rounded-2xl border border-slate-200 p-5 sm:flex-row sm:items-center"><div className="flex flex-1 items-start gap-3"><div className="rounded-xl bg-slate-100 p-2 text-slate-600">{session.userAgent?.toLowerCase().includes('mobile') ? <Smartphone className="h-5 w-5" /> : <Laptop className="h-5 w-5" />}</div><div><strong className="text-sm">{session.current ? 'Thiết bị hiện tại' : 'Phiên đăng nhập'}</strong><p className="mt-1 max-w-xl truncate text-xs text-slate-500">{session.userAgent || 'Không xác định trình duyệt'}</p><p className="mt-1 text-xs text-slate-400">Tạo: {formatDate(session.createdAt)} · Hết hạn: {formatDate(session.expiresAt)}</p></div></div><Button variant="outline" isLoading={revokePending} onClick={() => onRevoke(session)}>Thu hồi</Button></div>)}</div></Panel></div>;
+function SecurityTab({ password, setPassword, sessions, privacyRequests, passwordPending, revokePending, privacyPending, onPassword, onRevoke, onExport, onDeleteRequest }: { password: { currentPassword: string; newPassword: string; confirmPassword: string }; setPassword: (value: { currentPassword: string; newPassword: string; confirmPassword: string }) => void; sessions: AccountSession[]; privacyRequests: PersonalDataRequest[]; passwordPending: boolean; revokePending: boolean; privacyPending: boolean; onPassword: () => void; onRevoke: (session: AccountSession) => void; onExport: () => void; onDeleteRequest: () => void }) {
+  return <div className="space-y-6"><Panel title="Thay đổi mật khẩu" subtitle="Sau khi đổi, tất cả phiên đăng nhập sẽ bị thu hồi."><div className="grid gap-4 sm:grid-cols-3"><Input label="Mật khẩu hiện tại" type="password" value={password.currentPassword} onChange={(e) => setPassword({ ...password, currentPassword: e.target.value })} /><Input label="Mật khẩu mới" type="password" value={password.newPassword} onChange={(e) => setPassword({ ...password, newPassword: e.target.value })} /><Input label="Xác nhận mật khẩu" type="password" value={password.confirmPassword} onChange={(e) => setPassword({ ...password, confirmPassword: e.target.value })} /></div><div className="mt-5 flex justify-end"><Button leftIcon={<KeyRound className="h-4 w-4" />} isLoading={passwordPending} onClick={onPassword}>Đổi mật khẩu</Button></div></Panel><Panel title="Thiết bị đang đăng nhập" subtitle="Thu hồi bất kỳ phiên nào bạn không nhận ra."><div className="space-y-3">{sessions.map((session) => <div key={session.id} className="flex flex-col gap-4 rounded-2xl border border-slate-200 p-5 sm:flex-row sm:items-center"><div className="flex flex-1 items-start gap-3"><div className="rounded-xl bg-slate-100 p-2 text-slate-600">{session.userAgent?.toLowerCase().includes('mobile') ? <Smartphone className="h-5 w-5" /> : <Laptop className="h-5 w-5" />}</div><div><strong className="text-sm">{session.current ? 'Thiết bị hiện tại' : 'Phiên đăng nhập'}</strong><p className="mt-1 max-w-xl truncate text-xs text-slate-500">{session.userAgent || 'Không xác định trình duyệt'}</p><p className="mt-1 text-xs text-slate-400">Tạo: {formatDate(session.createdAt)} · Hết hạn: {formatDate(session.expiresAt)}</p></div></div><Button variant="outline" isLoading={revokePending} onClick={() => onRevoke(session)}>Thu hồi</Button></div>)}</div></Panel><Panel title="Quyền dữ liệu cá nhân" subtitle="Xem bản sao dữ liệu hoặc gửi yêu cầu xóa/ẩn danh có kiểm tra nghĩa vụ bảo hành, kế toán và giải quyết khiếu nại."><div className="grid gap-4 sm:grid-cols-2"><button type="button" onClick={onExport} className="group rounded-2xl border border-blue-100 bg-blue-50/60 p-5 text-left transition hover:border-blue-300"><Download className="h-5 w-5 text-blue-700" /><strong className="mt-3 block text-sm text-slate-950">Tải bản sao dữ liệu</strong><p className="mt-1 text-xs leading-5 text-slate-600">Hồ sơ, địa chỉ và lịch sử yêu cầu dịch vụ thuộc tài khoản.</p></button><button type="button" disabled={privacyPending} onClick={onDeleteRequest} className="group rounded-2xl border border-amber-100 bg-amber-50/60 p-5 text-left transition hover:border-amber-300 disabled:opacity-60"><Database className="h-5 w-5 text-amber-700" /><strong className="mt-3 block text-sm text-slate-950">Yêu cầu xóa hoặc ẩn danh</strong><p className="mt-1 text-xs leading-5 text-slate-600">Không xóa tự động dữ liệu đang có nghĩa vụ lưu trữ; trạng thái được theo dõi bên dưới.</p></button></div>{privacyRequests.length ? <div className="mt-5 space-y-2">{privacyRequests.map((request) => <div key={request.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-3 text-xs"><span><strong>{request.requestType}</strong> · {formatDate(request.requestedAt)}</span><StatusBadge value={request.status} /></div>)}</div> : null}</Panel></div>;
 }

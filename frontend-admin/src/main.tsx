@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '@/App';
 import AppProviders from '@/app/AppProviders';
+import { installGlobalErrorReporting } from '@/observability/errorReporter';
 import '@/index.css';
 import '@/styles/design-system.css';
 
@@ -18,3 +19,5 @@ createRoot(rootElement).render(
     </AppProviders>
   </StrictMode>,
 );
+
+installGlobalErrorReporting();

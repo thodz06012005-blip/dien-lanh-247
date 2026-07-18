@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { SettingsController } from './settings.controller';
+import { AuditLogModule } from '../audit/audit-log.module';
 
 @Module({
+  imports: [AuditLogModule],
   controllers: [SettingsController],
   providers: [SettingsService],
   exports: [SettingsService],

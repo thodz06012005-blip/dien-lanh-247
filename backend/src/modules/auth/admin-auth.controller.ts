@@ -32,6 +32,7 @@ import { AuditLogService } from '../audit/audit-log.service';
 import { AdminAccountService } from './admin-account.service';
 import { AuthService } from './auth.service';
 import {
+  AdminStepUpDto,
   ChangeAdminPasswordDto,
   UpdateAdminProfileDto,
 } from './dto/admin-profile.dto';
@@ -154,6 +155,45 @@ export class AdminAuthController {
     };
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPERADMIN)
+  @Post('step-up')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async stepUp(
+    @CurrentUser() user: AdminSessionUser,
+    @Body() dto: AdminStepUpDto,
+    @Res({ passthrough: true }) res: Response,
+    @Req() req: Request,
+  ) {
+    const token = await this.authService.issueAdminStepUp(
+      user.userId,
+      user.sessionId,
+      dto.currentPassword,
+    );
+    const secure = this.cookieSecure();
+    res.cookie('adminStepUpToken', token, {
+      httpOnly: true,
+      secure,
+      sameSite: 'strict',
+      path: '/api/v1/admin',
+      maxAge: 5 * 60_000,
+    });
+    this.auditLogService.auditSuccess(
+      req,
+      'SUPERADMIN_STEP_UP_VERIFIED',
+      'auth',
+      String(user.userId),
+      null,
+      'Super Admin step-up verified',
+    );
+    return {
+      success: true,
+      message: 'Đã xác minh lại Super Admin trong 5 phút.',
+      data: { expiresAt: Date.now() + 5 * 60_000 },
+    };
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN, UserRole.STAFF)
   @Permissions(ADMIN_PERMISSIONS.PROFILE_MANAGE)
@@ -163,7 +203,10 @@ export class AdminAuthController {
     @Body() dto: UpdateAdminProfileDto,
     @Req() req: Request,
   ) {
-    const admin = await this.adminAccountService.updateProfile(user.userId, dto);
+    const admin = await this.adminAccountService.updateProfile(
+      user.userId,
+      dto,
+    );
     this.auditLogService.auditSuccess(
       req,
       'ADMIN_PROFILE_UPDATED',
@@ -190,7 +233,10 @@ export class AdminAuthController {
     @Res({ passthrough: true }) res: Response,
     @Req() req: Request,
   ) {
-    const data = await this.adminAccountService.changePassword(user.userId, dto);
+    const data = await this.adminAccountService.changePassword(
+      user.userId,
+      dto,
+    );
     this.clearAdminCookies(res);
     this.auditLogService.auditSuccess(
       req,
@@ -291,5 +337,12 @@ export class AdminAuthController {
       sameSite,
       path: '/api/v1/admin/auth/refresh',
     });
+    res.clearCookie('adminStepUpToken', {
+      httpOnly: true,
+      secure,
+      sameSite: 'strict',
+      path: '/api/v1/admin',
+    });
+    res.setHeader('Clear-Site-Data', '"cache", "cookies", "storage"');
   }
 }

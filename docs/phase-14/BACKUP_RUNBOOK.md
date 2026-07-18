@@ -18,6 +18,7 @@ Giảm rủi ro mất dữ liệu bằng backup nhất quán, nén, có checksum
 export DATABASE_URL='mysql://USER:PASSWORD@HOST:3306/DATABASE'
 export BACKUP_DIRECTORY='/secure/dien-lanh-247/backups'
 export BACKUP_RETENTION_DAYS='14'
+export BACKUP_ENCRYPTION_KEY='<64-hex-character-key-from-secret-manager>'
 npm run backup:mysql
 ```
 
@@ -29,8 +30,9 @@ Script thực hiện:
 4. Ghi file SQL với permission `0600`.
 5. Nén gzip level 9.
 6. Xóa SQL chưa nén.
-7. Tạo file SHA-256.
-8. Xóa backup quá retention.
+7. Mã hóa AES-256-GCM trong production và xóa gzip plaintext.
+8. Tạo SHA-256 trên ciphertext.
+9. Xóa backup quá retention.
 
 Không chạy lệnh có `DATABASE_URL=...` trực tiếp trên terminal được ghi shell history. Production nên dùng systemd EnvironmentFile có quyền `0600`, Docker/Kubernetes secret hoặc CI secret injection.
 
@@ -38,7 +40,7 @@ Không chạy lệnh có `DATABASE_URL=...` trực tiếp trên terminal đượ
 
 ```bash
 cd /secure/dien-lanh-247/backups
-sha256sum -c dien_lanh_247-YYYY-MM-DDTHH-MM-SS.sql.gz.sha256
+sha256sum -c dien_lanh_247-YYYY-MM-DDTHH-MM-SS.sql.gz.enc.sha256
 ```
 
 Kết quả phải là `OK`. Backup checksum lỗi không được dùng để restore.
@@ -48,16 +50,20 @@ Kết quả phải là `OK`. Backup checksum lỗi không được dùng để r
 Không restore thử trực tiếp vào production.
 
 ```bash
-gunzip -c dien_lanh_247-YYYY-MM-DDTHH-MM-SS.sql.gz \
-  | mysql --host=STAGING_HOST --port=3306 --user=RESTORE_USER --password STAGING_DATABASE
+export DATABASE_URL='mysql://RESTORE_USER:PASSWORD@STAGING_HOST:3306/STAGING_DATABASE'
+export BACKUP_DIRECTORY='/secure/dien-lanh-247/backups'
+export BACKUP_ENCRYPTION_KEY='<load-from-secret-manager>'
+export RESTORE_FILE='/secure/dien-lanh-247/backups/dien_lanh_247-YYYY-MM-DDTHH-MM-SS.sql.gz.enc'
+export RESTORE_CONFIRM='STAGING_DATABASE'
+npm run restore:mysql
 ```
 
 Sau restore:
 
 1. Chạy Prisma migration status.
-2. Kiểm tra số lượng User, Product, Order, ServiceRequest và AuthSession.
+2. Kiểm tra số lượng User, ServiceRequest, ServiceQuote, ServicePaymentRecord và AuthSession.
 3. Đăng nhập bằng tài khoản staging.
-4. Kiểm tra một đơn hàng, một service request và một bài CMS.
+4. Kiểm tra một yêu cầu dịch vụ, báo giá, bảo hành và một bài CMS.
 5. Xác nhận dữ liệu audit không nằm trong `/uploads`.
 6. Ghi thời gian restore, RPO và RTO thực tế vào biên bản vận hành.
 
@@ -72,7 +78,7 @@ Sau restore:
 
 ## Mã hóa và quyền truy cập
 
-Script hiện tạo gzip + checksum, chưa tự mã hóa để tránh quản lý key sai trong source code. Production phải mã hóa ở storage layer bằng KMS/SSE hoặc pipeline vận hành dùng age/GPG với key nằm ngoài repository.
+Script mã hóa AES-256-GCM bằng khóa 32 byte lấy từ secret manager. Production từ chối chạy nếu thiếu khóa; khóa không được lưu cùng backup hoặc trong repository. Object storage vẫn phải bật KMS/SSE như lớp bảo vệ thứ hai.
 
 Chỉ nhóm vận hành được phép:
 
@@ -88,3 +94,4 @@ Chỉ nhóm vận hành được phép:
 3. Không gửi stderr chứa hostname/database nội bộ lên kênh công khai.
 4. Tạo incident nếu không có backup hợp lệ trong 24 giờ.
 5. Chạy lại sau khi sửa nguyên nhân và xác minh checksum.
+Production tạo file `.sql.gz.enc` bằng AES-256-GCM; checksum được tính trên ciphertext. Không lưu khóa cùng thư mục backup hoặc trong repository.

@@ -25,6 +25,9 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     const baseEvent = {
       event: 'http_request',
       requestId: request.requestId || 'unknown',
+      traceId: request.requestId || 'unknown',
+      serviceName: 'dien-lanh-247-api',
+      deploymentEnvironment: process.env.NODE_ENV || 'development',
       method: request.method,
       path: request.path,
       actorId: String(request.user?.userId || request.user?.sub || 'anonymous'),
@@ -39,18 +42,22 @@ export class RequestLoggingInterceptor implements NestInterceptor {
               ...baseEvent,
               statusCode: response.statusCode,
               durationMs: Date.now() - startedAt,
+              outcome: 'success',
             }),
           );
         },
         error: (error: unknown) => {
           const statusCode =
-            error instanceof HttpException ? error.getStatus() : response.statusCode || 500;
+            error instanceof HttpException
+              ? error.getStatus()
+              : response.statusCode || 500;
           this.logger.error(
             JSON.stringify({
               ...baseEvent,
               statusCode,
               durationMs: Date.now() - startedAt,
               errorName: error instanceof Error ? error.name : 'UnknownError',
+              outcome: 'error',
             }),
           );
         },

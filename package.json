@@ -43,6 +43,7 @@
     "format:check": "node backend/node_modules/prettier/bin/prettier.cjs --check .",
     "validate:repo": "node scripts/validate-repository.mjs",
     "security:scan": "node scripts/scan-secrets.mjs",
+    "seo:scan-commerce-metadata": "node scripts/scan-commerce-metadata.mjs",
     "security:check": "npm run security:scan && node --check scripts/backup-mysql.mjs && node --check scripts/restore-mysql.mjs",
     "backup:mysql": "node scripts/backup-mysql.mjs",
     "restore:mysql": "node scripts/restore-mysql.mjs",

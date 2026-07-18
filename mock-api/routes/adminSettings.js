@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { readDB, writeDB } = require('../utils/db');
 const { respondSuccess } = require('../utils/response');
-const { requirePermission } = require('../utils/auth');
+const { requirePermission, requireSuperAdminStepUp } = require('../utils/auth');
 const { isValidEmail } = require('../utils/validators');
 const { auditSuccess } = require('../utils/auditLog');
 const { validateOptionalString, sendValidationError } = require('../utils/validation');
@@ -20,7 +20,11 @@ router.get('/admin/settings', requirePermission('settings:read'), (req, res) => 
 });
 
 // PATCH /admin/settings — requires: settings:update (superadmin ONLY)
-router.patch('/admin/settings', requirePermission('settings:update'), (req, res) => {
+router.patch(
+  '/admin/settings',
+  requirePermission('settings:update'),
+  requireSuperAdminStepUp,
+  (req, res) => {
   const body = req.body;
   const errors = [];
 
@@ -69,6 +73,7 @@ router.patch('/admin/settings', requirePermission('settings:update'), (req, res)
     'System settings updated successfully',
   );
   return respondSuccess(res, db.settings, 'Cập nhật cài đặt hệ thống thành công');
-});
+  },
+);
 
 module.exports = router;
