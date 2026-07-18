@@ -30,7 +30,7 @@ Mỗi ca trực kiểm tra:
 - `/api/v1/health/ready` trả database `up`;
 - log không tăng đột biến 5xx/429;
 - dung lượng volume database, audit, media và backup;
-- backup mới nhất có file `.sql.gz` cùng `.sha256`;
+- backup mới nhất có file `.sql.gz.enc` cùng `.sha256`;
 - audit integrity trả `valid=true`.
 
 ## Health check và cảnh báo

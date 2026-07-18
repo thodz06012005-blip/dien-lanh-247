@@ -74,7 +74,7 @@ Mỗi test kiểm tra status, body, title, runtime error và horizontal overflow
 ## 6. Backup/restore drill
 
 1. tạo dữ liệu sentinel;
-2. chạy backup `.sql.gz`;
+2. chạy backup mã hóa `.sql.gz.enc`;
 3. kiểm tra `.sha256`;
 4. tạo database restore tạm;
 5. chạy restore utility với confirmation;
