@@ -5,10 +5,12 @@ ARG VITE_APP_ENV=production
 ARG VITE_APP_URL=https://admin.dienlanh247.example
 ARG VITE_API_BASE_URL=https://admin.dienlanh247.example/api/v1
 ARG VITE_USE_MOCK_API=false
+ARG VITE_SERVICE_ONLY_MODE=true
 ENV VITE_APP_ENV=$VITE_APP_ENV \
     VITE_APP_URL=$VITE_APP_URL \
     VITE_API_BASE_URL=$VITE_API_BASE_URL \
-    VITE_USE_MOCK_API=$VITE_USE_MOCK_API
+    VITE_USE_MOCK_API=$VITE_USE_MOCK_API \
+    VITE_SERVICE_ONLY_MODE=$VITE_SERVICE_ONLY_MODE
 COPY frontend-admin/package.json frontend-admin/package-lock.json ./
 RUN npm ci
 COPY frontend-admin/ ./

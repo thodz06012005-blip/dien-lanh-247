@@ -9,6 +9,7 @@ const environmentSchema = z.object({
   VITE_USE_MOCK_API: z.enum(['true', 'false']).optional(),
   VITE_USE_MOCK: z.enum(['true', 'false']).optional(),
   VITE_ENABLE_QUERY_DEVTOOLS: z.enum(['true', 'false']).default('false'),
+  VITE_SERVICE_ONLY_MODE: z.enum(['true', 'false']).default('true'),
 });
 
 const parsedEnvironment = environmentSchema.safeParse(import.meta.env);
@@ -23,6 +24,11 @@ if (!parsedEnvironment.success) {
 
 const raw = parsedEnvironment.data;
 const useMockApi = (raw.VITE_USE_MOCK_API ?? raw.VITE_USE_MOCK ?? 'true') === 'true';
+const serviceOnlyMode = raw.VITE_SERVICE_ONLY_MODE === 'true';
+
+if (raw.VITE_APP_ENV === 'production' && !serviceOnlyMode) {
+  throw new Error('VITE_SERVICE_ONLY_MODE must be true in production.');
+}
 
 export const env = Object.freeze({
   appName: raw.VITE_APP_NAME,
@@ -32,6 +38,7 @@ export const env = Object.freeze({
   apiTimeoutMs: raw.VITE_API_TIMEOUT_MS,
   useMockApi,
   enableQueryDevtools: raw.VITE_ENABLE_QUERY_DEVTOOLS === 'true',
+  serviceOnlyMode,
   isDevelopment: raw.VITE_APP_ENV === 'development',
   isProduction: raw.VITE_APP_ENV === 'production',
 });

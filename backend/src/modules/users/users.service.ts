@@ -117,14 +117,15 @@ export class UsersService {
   async getOverview(userId: number) {
     const user = await this.getAccountRow(userId);
     await this.linkEligibleRequests(user);
+    const serviceOnlyMode = this.configService.get<boolean>('SERVICE_ONLY_MODE', true);
     const [addresses, stats, unreadRows, sessions] = await Promise.all([
       this.listAddresses(userId),
       this.prisma.$queryRawUnsafe<Array<{ serviceCount: bigint; orderCount: bigint }>>(
         `SELECT
           (SELECT COUNT(*) FROM ServiceRequest WHERE customerUserId = ?) AS serviceCount,
-          (SELECT COUNT(*) FROM \`Order\` WHERE userId = ?) AS orderCount`,
+          ${serviceOnlyMode ? '0' : '(SELECT COUNT(*) FROM `Order` WHERE userId = ?)'} AS orderCount`,
         userId,
-        userId,
+        ...(!serviceOnlyMode ? [userId] : []),
       ),
       this.prisma.$queryRawUnsafe<Array<{ total: bigint }>>(
         'SELECT COUNT(*) AS total FROM CustomerNotification WHERE userId = ? AND readAt IS NULL',

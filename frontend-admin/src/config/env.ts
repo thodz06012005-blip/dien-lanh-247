@@ -39,6 +39,11 @@ if (!allowedEnvironments.has(appEnvironment)) {
 }
 
 const useMockValue = import.meta.env.VITE_USE_MOCK_API ?? import.meta.env.VITE_USE_MOCK;
+const serviceOnlyMode = readBoolean(import.meta.env.VITE_SERVICE_ONLY_MODE, true);
+
+if (appEnvironment === 'production' && !serviceOnlyMode) {
+  throw new Error('VITE_SERVICE_ONLY_MODE must be true in production.');
+}
 
 export const env = Object.freeze({
   appName: import.meta.env.VITE_APP_NAME?.trim() || 'Điện Lạnh 247 - Admin',
@@ -48,6 +53,7 @@ export const env = Object.freeze({
   apiTimeoutMs: readInteger(import.meta.env.VITE_API_TIMEOUT_MS, 15_000),
   useMockApi: readBoolean(useMockValue, true),
   enableQueryDevtools: readBoolean(import.meta.env.VITE_ENABLE_QUERY_DEVTOOLS, false),
+  serviceOnlyMode,
   isDevelopment: appEnvironment === 'development',
   isProduction: appEnvironment === 'production',
 });

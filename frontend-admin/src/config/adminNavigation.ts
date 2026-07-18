@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { ADMIN_PERMISSIONS } from './adminPermissions';
+import { env } from './env';
 import type { AdminPermission } from '@/types/admin';
 
 export interface AdminNavigationItem {
@@ -22,6 +23,7 @@ export interface AdminNavigationItem {
   permission: AdminPermission;
   exact?: boolean;
   keywords?: string[];
+  commerceOnly?: boolean;
 }
 
 export interface AdminNavigationGroup {
@@ -29,20 +31,20 @@ export interface AdminNavigationGroup {
   items: AdminNavigationItem[];
 }
 
-export const adminNavigation: AdminNavigationGroup[] = [
+const completeAdminNavigation: AdminNavigationGroup[] = [
   {
     title: 'Điều hành',
     items: [
       { path: '/', label: 'Tổng quan hệ thống', shortLabel: 'Tổng quan', icon: LayoutDashboard, permission: ADMIN_PERMISSIONS.DASHBOARD_VIEW, exact: true, keywords: ['dashboard', 'kpi'] },
       { path: '/operations', label: 'Trung tâm điều phối', shortLabel: 'Điều phối', icon: Workflow, permission: ADMIN_PERMISSIONS.OPERATIONS_VIEW, keywords: ['sla', 'báo giá', 'bảo hành', 'kỹ thuật viên', 'thiết bị'] },
-      { path: '/orders', label: 'Quản lý đơn hàng', shortLabel: 'Đơn hàng', icon: ShoppingBag, permission: ADMIN_PERMISSIONS.ORDERS_VIEW, keywords: ['giao hàng', 'thanh toán'] },
+      { path: '/orders', label: 'Quản lý đơn hàng', shortLabel: 'Đơn hàng', icon: ShoppingBag, permission: ADMIN_PERMISSIONS.ORDERS_VIEW, keywords: ['giao hàng', 'thanh toán'], commerceOnly: true },
       { path: '/service-requests', label: 'Yêu cầu sửa chữa', shortLabel: 'Dịch vụ', icon: Wrench, permission: ADMIN_PERMISSIONS.SERVICES_VIEW, keywords: ['yêu cầu', 'trạng thái'] },
     ],
   },
   {
     title: 'Danh mục',
     items: [
-      { path: '/products', label: 'Quản lý sản phẩm', shortLabel: 'Sản phẩm', icon: Package, permission: ADMIN_PERMISSIONS.PRODUCTS_VIEW, keywords: ['tồn kho', 'sku'] },
+      { path: '/products', label: 'Quản lý sản phẩm', shortLabel: 'Sản phẩm', icon: Package, permission: ADMIN_PERMISSIONS.PRODUCTS_VIEW, keywords: ['tồn kho', 'sku'], commerceOnly: true },
       { path: '/customers', label: 'Quản lý khách hàng', shortLabel: 'Khách hàng', icon: Users, permission: ADMIN_PERMISSIONS.CUSTOMERS_VIEW, keywords: ['crm', 'tài khoản'] },
       { path: '/technicians', label: 'Quản lý kỹ thuật viên', shortLabel: 'Kỹ thuật viên', icon: UserRound, permission: ADMIN_PERMISSIONS.TECHNICIANS_VIEW, keywords: ['thợ', 'phân công'] },
       { path: '/content', label: 'Nội dung website', shortLabel: 'Nội dung', icon: FileText, permission: ADMIN_PERMISSIONS.CONTENT_VIEW, keywords: ['bài viết', 'dự án'] },
@@ -56,6 +58,13 @@ export const adminNavigation: AdminNavigationGroup[] = [
     ],
   },
 ];
+
+export const adminNavigation: AdminNavigationGroup[] = completeAdminNavigation
+  .map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !env.serviceOnlyMode || !item.commerceOnly),
+  }))
+  .filter((group) => group.items.length > 0);
 
 export const flatAdminNavigation = adminNavigation.flatMap((group) => group.items);
 

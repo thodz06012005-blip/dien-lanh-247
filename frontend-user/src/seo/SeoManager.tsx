@@ -4,8 +4,6 @@ import { useLocation } from 'react-router-dom';
 import { getPost, getProject, getService } from '@/services/contentApi';
 
 const SITE_URL = (import.meta.env.VITE_SITE_URL || 'https://dienlanh247.vn').replace(/\/$/, '');
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api/v1').replace(/\/$/, '');
-const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
 const DEFAULT_IMAGE = `${SITE_URL}/og-cover.jpg`;
 const BUSINESS_NAME = 'Điện Lạnh 247';
 const CACHE_FIVE_MINUTES = 5 * 60_000;
@@ -15,20 +13,8 @@ interface SeoEntry {
   description: string;
   image?: string;
   noindex?: boolean;
-  type?: 'website' | 'article' | 'product';
+  type?: 'website' | 'article';
   schema?: Record<string, unknown> | Record<string, unknown>[];
-}
-
-interface ProductSeoRecord {
-  name?: string;
-  description?: string;
-  thumbnail?: string;
-  images?: string[];
-  sku?: string;
-  basePrice?: number;
-  salePrice?: number;
-  inStock?: boolean;
-  brand?: { name?: string };
 }
 
 const staticSeo: Record<string, SeoEntry> = {
@@ -63,10 +49,6 @@ const staticSeo: Record<string, SeoEntry> = {
     title: 'Kiến thức điện lạnh | Điện Lạnh 247',
     description: 'Hướng dẫn sử dụng, bảo trì và xử lý các lỗi phổ biến của điều hòa, tủ lạnh, máy giặt và thiết bị điện lạnh.',
   },
-  '/products': {
-    title: 'Sản phẩm điện lạnh chính hãng | Điện Lạnh 247',
-    description: 'Danh mục sản phẩm và linh kiện điện lạnh chính hãng, thông tin rõ ràng, giá minh bạch và hỗ trợ kỹ thuật chuyên nghiệp.',
-  },
   '/about': {
     title: 'Giới thiệu Điện Lạnh 247',
     description: 'Tìm hiểu đội ngũ, năng lực, quy trình và cam kết chất lượng của Điện Lạnh 247.',
@@ -81,7 +63,7 @@ const staticSeo: Record<string, SeoEntry> = {
   },
   '/policy/warranty': {
     title: 'Chính sách bảo hành | Điện Lạnh 247',
-    description: 'Điều kiện, phạm vi và quy trình tiếp nhận bảo hành dịch vụ và sản phẩm tại Điện Lạnh 247.',
+    description: 'Điều kiện, phạm vi và quy trình tiếp nhận bảo hành dịch vụ tại Điện Lạnh 247.',
   },
   '/policy/privacy': {
     title: 'Chính sách bảo mật | Điện Lạnh 247',
@@ -91,14 +73,6 @@ const staticSeo: Record<string, SeoEntry> = {
     title: 'Điều khoản sử dụng | Điện Lạnh 247',
     description: 'Điều khoản sử dụng website, đặt dịch vụ và giao dịch với Điện Lạnh 247.',
   },
-  '/policy/shipping': {
-    title: 'Chính sách giao nhận | Điện Lạnh 247',
-    description: 'Phạm vi, thời gian, chi phí và quy trình giao nhận sản phẩm của Điện Lạnh 247.',
-  },
-  '/policy/returns': {
-    title: 'Chính sách đổi trả | Điện Lạnh 247',
-    description: 'Điều kiện và quy trình đổi trả sản phẩm tại Điện Lạnh 247.',
-  },
   '/policy/payment': {
     title: 'Phương thức thanh toán | Điện Lạnh 247',
     description: 'Các phương thức thanh toán an toàn và quy trình xác nhận thanh toán tại Điện Lạnh 247.',
@@ -106,15 +80,12 @@ const staticSeo: Record<string, SeoEntry> = {
 };
 
 const privateSeo: Record<string, SeoEntry> = {
-  '/cart': { title: 'Giỏ hàng | Điện Lạnh 247', description: 'Kiểm tra sản phẩm trong giỏ hàng trước khi thanh toán.', noindex: true },
-  '/checkout': { title: 'Thanh toán | Điện Lạnh 247', description: 'Hoàn tất thông tin giao hàng và thanh toán đơn hàng.', noindex: true },
   '/login': { title: 'Đăng nhập | Điện Lạnh 247', description: 'Đăng nhập tài khoản khách hàng Điện Lạnh 247.', noindex: true },
-  '/register': { title: 'Đăng ký tài khoản | Điện Lạnh 247', description: 'Tạo tài khoản để quản lý lịch sử dịch vụ và đơn hàng.', noindex: true },
+  '/register': { title: 'Đăng ký tài khoản | Điện Lạnh 247', description: 'Tạo tài khoản để quản lý lịch sử dịch vụ và bảo hành.', noindex: true },
   '/forgot-password': { title: 'Quên mật khẩu | Điện Lạnh 247', description: 'Yêu cầu liên kết đặt lại mật khẩu an toàn.', noindex: true },
   '/reset-password': { title: 'Đặt lại mật khẩu | Điện Lạnh 247', description: 'Tạo mật khẩu mới cho tài khoản khách hàng.', noindex: true },
   '/verify-email': { title: 'Xác minh email | Điện Lạnh 247', description: 'Xác minh địa chỉ email của tài khoản khách hàng.', noindex: true },
   '/account': { title: 'Tài khoản của tôi | Điện Lạnh 247', description: 'Quản lý hồ sơ, địa chỉ, thông báo và thiết bị đăng nhập.', noindex: true },
-  '/orders': { title: 'Đơn hàng của tôi | Điện Lạnh 247', description: 'Theo dõi đơn hàng thuộc tài khoản đang đăng nhập.', noindex: true },
   '/my-services': { title: 'Yêu cầu dịch vụ của tôi | Điện Lạnh 247', description: 'Theo dõi tiến độ các yêu cầu dịch vụ thuộc tài khoản.', noindex: true },
   '/service-lookup': { title: 'Tra cứu yêu cầu dịch vụ | Điện Lạnh 247', description: 'Tra cứu trạng thái yêu cầu bằng mã và thông tin xác thực.', noindex: true },
   '/quote-confirmation': { title: 'Xác nhận báo giá | Điện Lạnh 247', description: 'Xem và phản hồi báo giá dịch vụ an toàn.', noindex: true },
@@ -127,7 +98,6 @@ function segmentLabel(segment: string) {
     services: 'Dịch vụ',
     projects: 'Dự án',
     articles: 'Bài viết',
-    products: 'Sản phẩm',
     about: 'Giới thiệu',
     contact: 'Liên hệ',
     policy: 'Chính sách',
@@ -138,7 +108,7 @@ function segmentLabel(segment: string) {
 function fallbackSeo(pathname: string): SeoEntry {
   if (staticSeo[pathname]) return staticSeo[pathname];
   if (privateSeo[pathname]) return privateSeo[pathname];
-  if (/^\/(account|orders|my-services)(\/|$)/.test(pathname)) {
+  if (/^\/(account|my-services)(\/|$)/.test(pathname)) {
     return { title: 'Khu vực khách hàng | Điện Lạnh 247', description: 'Nội dung riêng tư dành cho tài khoản đang đăng nhập.', noindex: true };
   }
   if (/^\/services\/[\w-]+$/.test(pathname)) {
@@ -146,9 +116,6 @@ function fallbackSeo(pathname: string): SeoEntry {
   }
   if (/^\/projects\/[\w-]+$/.test(pathname)) {
     return { title: 'Chi tiết dự án | Điện Lạnh 247', description: 'Thông tin dự án điện lạnh tiêu biểu do Điện Lạnh 247 thực hiện.' };
-  }
-  if (/^\/products\/[\w-]+$/.test(pathname)) {
-    return { title: 'Chi tiết sản phẩm | Điện Lạnh 247', description: 'Thông tin sản phẩm, thông số, giá bán và chính sách hỗ trợ tại Điện Lạnh 247.', type: 'product' };
   }
   if (/^\/articles\/[\w-]+$/.test(pathname)) {
     return { title: 'Bài viết điện lạnh | Điện Lạnh 247', description: 'Kiến thức và hướng dẫn thực tế về sử dụng, bảo trì và sửa chữa thiết bị điện lạnh.', type: 'article' };
@@ -166,33 +133,15 @@ function setMeta(selector: string, attribute: 'name' | 'property', key: string, 
   node.content = content;
 }
 
-function unwrapProduct(payload: unknown): ProductSeoRecord | undefined {
-  const first = payload as { data?: unknown };
-  const second = first?.data as { data?: unknown } | undefined;
-  return (second?.data || first?.data || payload) as ProductSeoRecord | undefined;
-}
-
-async function getProductSeo(identifier: string) {
-  const response = await fetch(`${API_BASE_URL}/products/${encodeURIComponent(identifier)}`, {
-    headers: { Accept: 'application/json' },
-    credentials: 'omit',
-    signal: AbortSignal.timeout(API_TIMEOUT_MS),
-  });
-  if (!response.ok) throw new Error(`Product SEO request failed: ${response.status}`);
-  return { data: unwrapProduct(await response.json()) };
-}
-
 export default function SeoManager() {
   const { pathname } = useLocation();
   const serviceSlug = pathname.match(/^\/services\/([\w-]+)$/)?.[1] || '';
   const projectSlug = pathname.match(/^\/projects\/([\w-]+)$/)?.[1] || '';
   const articleSlug = pathname.match(/^\/articles\/([\w-]+)$/)?.[1] || '';
-  const productIdentifier = pathname.match(/^\/products\/([\w-]+)$/)?.[1] || '';
 
   const serviceQuery = useQuery({ queryKey: ['managed-service', serviceSlug], queryFn: () => getService(serviceSlug), enabled: Boolean(serviceSlug), staleTime: CACHE_FIVE_MINUTES });
   const projectQuery = useQuery({ queryKey: ['managed-project', projectSlug], queryFn: () => getProject(projectSlug), enabled: Boolean(projectSlug), staleTime: CACHE_FIVE_MINUTES });
   const articleQuery = useQuery({ queryKey: ['managed-post', articleSlug], queryFn: () => getPost(articleSlug), enabled: Boolean(articleSlug), staleTime: CACHE_FIVE_MINUTES });
-  const productQuery = useQuery({ queryKey: ['product', productIdentifier], queryFn: () => getProductSeo(productIdentifier), enabled: Boolean(productIdentifier), staleTime: CACHE_FIVE_MINUTES });
 
   const seo = useMemo<SeoEntry>(() => {
     const service = serviceQuery.data?.data;
@@ -246,31 +195,8 @@ export default function SeoManager() {
       };
     }
 
-    const product = productQuery.data?.data;
-    if (product) {
-      const price = product.salePrice || product.basePrice;
-      return {
-        title: `${product.name || 'Sản phẩm điện lạnh'} | ${BUSINESS_NAME}`,
-        description: product.description || 'Sản phẩm điện lạnh chính hãng, thông tin minh bạch và hỗ trợ kỹ thuật chuyên nghiệp.',
-        image: product.thumbnail || product.images?.[0] || DEFAULT_IMAGE,
-        type: 'product',
-        schema: {
-          '@context': 'https://schema.org', '@type': 'Product', name: product.name,
-          description: product.description,
-          image: product.images?.length ? product.images : [product.thumbnail || DEFAULT_IMAGE],
-          sku: product.sku,
-          brand: { '@type': 'Brand', name: product.brand?.name || BUSINESS_NAME },
-          offers: price ? {
-            '@type': 'Offer', priceCurrency: 'VND', price,
-            availability: product.inStock === false ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
-            url: `${SITE_URL}${pathname}`,
-          } : undefined,
-        },
-      };
-    }
-
     return fallbackSeo(pathname);
-  }, [articleQuery.data?.data, pathname, productQuery.data?.data, projectQuery.data?.data, serviceQuery.data?.data]);
+  }, [articleQuery.data?.data, pathname, projectQuery.data?.data, serviceQuery.data?.data]);
 
   useEffect(() => {
     const canonical = `${SITE_URL}${pathname === '/' ? '' : pathname}`;

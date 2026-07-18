@@ -18,6 +18,7 @@ import Card from '@/components/ui/Card';
 import ErrorState from '@/components/ui/EmptyState';
 import LoadingState from '@/components/ui/LoadingState';
 import api from '@/services/api';
+import { env } from '@/config/env';
 
 interface DashboardSnapshot {
   generatedAt: string;
@@ -133,10 +134,21 @@ export default function Dashboard() {
       </section>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard icon={Banknote} label="Doanh thu hôm nay" value={currency.format(data.kpis.todayRevenue)} detail="Đơn đã giao trong ngày" trend={revenue} tone="blue" />
-        <KpiCard icon={ShoppingBag} label="Tổng đơn hàng" value={String(data.kpis.totalOrders)} detail={`${data.kpis.pendingOrders} đơn chờ xác nhận`} trend={orderCounts} tone="green" />
-        <KpiCard icon={Wrench} label="Yêu cầu đang mở" value={String(data.kpis.openServiceRequests)} detail="Cần tiếp tục điều phối" trend={data.charts.serviceStatus.map((item) => item.total)} tone="purple" />
-        <KpiCard icon={PackageSearch} label="SKU tồn kho thấp" value={String(data.kpis.lowStockVariants)} detail={`${data.kpis.totalProducts} sản phẩm đang bán`} trend={data.lowStock.map((item) => item.stock)} tone="orange" />
+        {env.serviceOnlyMode ? (
+          <>
+            <KpiCard icon={Wrench} label="Yêu cầu đang mở" value={String(data.kpis.openServiceRequests)} detail="Cần tiếp tục điều phối" trend={data.charts.serviceStatus.map((item) => item.total)} tone="purple" />
+            <KpiCard icon={UserRoundCheck} label="Kỹ thuật viên hoạt động" value={String(data.kpis.activeTechnicians)} detail="Sẵn sàng hoặc đang phục vụ" trend={[data.kpis.activeTechnicians]} tone="blue" />
+            <KpiCard icon={Users} label="Khách hàng mới" value={String(data.kpis.newCustomers)} detail="Ghi nhận trong hôm nay" trend={[data.kpis.newCustomers]} tone="green" />
+            <KpiCard icon={AlertTriangle} label="Công việc cần chú ý" value={String(data.attention.length)} detail="Ưu tiên xử lý theo SLA" trend={[data.attention.length]} tone="orange" />
+          </>
+        ) : (
+          <>
+            <KpiCard icon={Banknote} label="Doanh thu hôm nay" value={currency.format(data.kpis.todayRevenue)} detail="Đơn đã giao trong ngày" trend={revenue} tone="blue" />
+            <KpiCard icon={ShoppingBag} label="Tổng đơn hàng" value={String(data.kpis.totalOrders)} detail={`${data.kpis.pendingOrders} đơn chờ xác nhận`} trend={orderCounts} tone="green" />
+            <KpiCard icon={Wrench} label="Yêu cầu đang mở" value={String(data.kpis.openServiceRequests)} detail="Cần tiếp tục điều phối" trend={data.charts.serviceStatus.map((item) => item.total)} tone="purple" />
+            <KpiCard icon={PackageSearch} label="SKU tồn kho thấp" value={String(data.kpis.lowStockVariants)} detail={`${data.kpis.totalProducts} sản phẩm đang bán`} trend={data.lowStock.map((item) => item.stock)} tone="orange" />
+          </>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -145,10 +157,10 @@ export default function Dashboard() {
         <MiniMetric icon={AlertTriangle} label="Công việc cần chú ý" value={data.attention.length} critical={data.attention.some((item) => item.severity === 'critical')} />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.65fr_0.85fr]">
+      {!env.serviceOnlyMode && <div className="grid gap-6 xl:grid-cols-[1.65fr_0.85fr]">
         <SimpleLineChart data={revenue} labels={labels} orderCounts={orderCounts} />
         <DonutChart data={orderDonut} total={totalOrderStatus} />
-      </div>
+      </div>}
 
       <Card title="Phân bố yêu cầu dịch vụ" subtitle="Theo trạng thái workflow hiện tại">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -162,14 +174,14 @@ export default function Dashboard() {
       </Card>
 
       <section>
-        <div className="mb-4"><h2 className="text-xl font-black text-slate-950">Công việc cần chú ý</h2><p className="mt-1 text-sm text-slate-500">Được tổng hợp từ yêu cầu khẩn, đơn chờ lâu và tồn kho thấp.</p></div>
+        <div className="mb-4"><h2 className="text-xl font-black text-slate-950">Công việc cần chú ý</h2><p className="mt-1 text-sm text-slate-500">{env.serviceOnlyMode ? 'Được tổng hợp từ các yêu cầu dịch vụ khẩn.' : 'Được tổng hợp từ yêu cầu khẩn, đơn chờ lâu và tồn kho thấp.'}</p></div>
         <AdminDataTable rows={data.attention} columns={attentionColumns} rowKey={(item) => item.id} searchFields={['title', 'description', 'type']} filters={[{ key: 'severity', label: 'Mức độ', options: [{ label: 'Khẩn', value: 'critical' }, { label: 'Cần chú ý', value: 'warning' }], predicate: (item, value) => item.severity === value }]} selectable exportFileName="admin-attention.csv" defaultPageSize={10} emptyTitle="Không có công việc tồn đọng" emptyDescription="Mọi hàng đợi quan trọng đã được xử lý." />
       </section>
 
-      <section>
+      {!env.serviceOnlyMode && <section>
         <div className="mb-4 flex items-end justify-between"><div><h2 className="text-xl font-black text-slate-950">Đơn hàng gần đây</h2><p className="mt-1 text-sm text-slate-500">Tám đơn mới nhất trong hệ thống.</p></div><Link to="/orders" className="text-sm font-black text-primary-700 hover:underline">Xem tất cả</Link></div>
         <AdminDataTable rows={data.recentOrders} columns={recentOrderColumns} rowKey={(order) => order.id} searchFields={['orderNumber', 'customer', 'status']} filters={[{ key: 'status', label: 'Trạng thái', options: Object.entries(orderStatusLabels).map(([value, label]) => ({ value: value.toLowerCase(), label })), predicate: (order, value) => order.status === value }]} exportFileName="recent-orders.csv" defaultPageSize={10} />
-      </section>
+      </section>}
     </div>
   );
 }

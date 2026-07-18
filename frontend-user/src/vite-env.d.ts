@@ -9,6 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_USE_MOCK_API?: 'true' | 'false';
   readonly VITE_USE_MOCK?: 'true' | 'false';
   readonly VITE_ENABLE_QUERY_DEVTOOLS?: 'true' | 'false';
+  readonly VITE_SERVICE_ONLY_MODE?: 'true' | 'false';
 }
 
 interface ImportMeta {

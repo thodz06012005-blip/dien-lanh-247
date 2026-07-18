@@ -1,4 +1,7 @@
-const getInitialData = () => {
+const { resolveServiceOnlyMode } = require('../config/serviceOnly');
+
+const getInitialData = (environment = process.env) => {
+  const serviceOnlyMode = resolveServiceOnlyMode(environment);
   const categories = [
     { id: 'dieu-hoa', name: 'Điều hòa', slug: 'dieu-hoa', icon: 'Wind', productCount: 15 },
     { id: 'tu-lanh', name: 'Tủ lạnh', slug: 'tu-lanh', icon: 'Snowflake', productCount: 12 },
@@ -766,12 +769,14 @@ const getInitialData = () => {
   ];
 
   return {
-    categories,
-    brands,
+    categories: serviceOnlyMode ? [] : categories,
+    brands: serviceOnlyMode ? [] : brands,
     settings,
-    products,
-    orders: initialOrders,
-    customers,
+    products: serviceOnlyMode ? [] : products,
+    orders: serviceOnlyMode ? [] : initialOrders,
+    customers: serviceOnlyMode
+      ? customers.map(customer => ({ ...customer, orderCount: 0, totalSpent: 0 }))
+      : customers,
     contacts: [],
     serviceCategories,
     serviceRequests,

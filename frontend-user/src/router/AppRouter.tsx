@@ -7,14 +7,11 @@ import api from '@/services/api';
 
 const Home = lazy(() => import('@/pages/Home'));
 const Services = lazy(() => import('@/pages/Services'));
-const Products = lazy(() => import('@/pages/Products'));
 const Articles = lazy(() => import('@/pages/Articles'));
 const ServiceBooking = lazy(() => import('@/pages/ServiceBooking'));
 const About = lazy(() => import('@/pages/About'));
 const Account = lazy(() => import('@/pages/Account'));
 const ArticleDetail = lazy(() => import('@/pages/ArticleDetail'));
-const Cart = lazy(() => import('@/pages/Cart'));
-const Checkout = lazy(() => import('@/pages/Checkout'));
 const Contact = lazy(() => import('@/pages/Contact'));
 const DesignSystem = lazy(() => import('@/pages/DesignSystem'));
 const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
@@ -22,9 +19,7 @@ const Login = lazy(() => import('@/pages/Login'));
 const MyServiceDetail = lazy(() => import('@/pages/MyServiceDetail'));
 const MyServices = lazy(() => import('@/pages/MyServices'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
-const Orders = lazy(() => import('@/pages/Orders'));
 const Policy = lazy(() => import('@/pages/Policy'));
-const ProductDetail = lazy(() => import('@/pages/ProductDetail'));
 const ProjectDetail = lazy(() => import('@/pages/ProjectDetail'));
 const Projects = lazy(() => import('@/pages/Projects'));
 const QuoteConfirmation = lazy(() => import('@/pages/QuoteConfirmation'));
@@ -129,11 +124,14 @@ export default function AppRouter() {
             <Route path="articles/:slug" element={<ArticleDetail />} />
             <Route path="about" element={<About />} />
             <Route path="contact" element={<Contact />} />
+            <Route path="policy/shipping" element={<Navigate to="/policy/terms" replace />} />
+            <Route path="policy/return" element={<Navigate to="/policy/warranty" replace />} />
+            <Route path="policy/returns" element={<Navigate to="/policy/warranty" replace />} />
             <Route path="policy/:slug" element={<Policy />} />
-            <Route path="products" element={<Products />} />
-            <Route path="products/:id" element={<ProductDetail />} />
-            <Route path="cart" element={<Cart />} />
-            <Route path="checkout" element={<Checkout />} />
+            <Route path="products/*" element={<Navigate to="/services" replace />} />
+            <Route path="cart" element={<Navigate to="/service-booking" replace />} />
+            <Route path="checkout" element={<Navigate to="/service-booking" replace />} />
+            <Route path="orders/*" element={<Navigate to="/account?tab=services" replace />} />
             <Route path="service-booking" element={<ServiceBooking />} />
             <Route path="service-booking/success" element={<ServiceBookingSuccess />} />
             <Route path="service-lookup" element={<ServiceRequestLookup />} />
@@ -141,7 +139,6 @@ export default function AppRouter() {
             <Route path="design-system" element={<DesignSystem />} />
             <Route element={<ProtectedRoute />}>
               <Route path="account" element={<Account />} />
-              <Route path="orders" element={<Orders />} />
               <Route path="my-services" element={<MyServices />} />
               <Route path="my-services/:id" element={<MyServiceDetail />} />
             </Route>

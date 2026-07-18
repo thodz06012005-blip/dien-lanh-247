@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
 import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
+import { ServiceOnlyGuard } from './common/guards/service-only.guard';
 import { validateEnvironment } from './config/environment';
 import { PrismaModule } from './core/database/prisma.module';
 import { CloudinaryModule } from './integrations/cloudinary/cloudinary.module';
@@ -77,6 +78,7 @@ import { UsersModule } from './modules/users/users.module';
   providers: [
     AppService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: ServiceOnlyGuard },
     { provide: APP_INTERCEPTOR, useClass: RequestLoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ApiResponseInterceptor },
   ],

@@ -16,7 +16,6 @@ test('Phase 13 uses crawlable routes and dynamic editorial metadata', () => {
     'getService',
     'getProject',
     'getPost',
-    "queryKey: ['product'",
     'seoTitle',
     'seoDescription',
     'socialImageUrl',
@@ -26,13 +25,15 @@ test('Phase 13 uses crawlable routes and dynamic editorial metadata', () => {
   ]) {
     assert.match(seo, new RegExp(marker.replace(/[\[\]]/g, '\\$&')));
   }
+  assert.doesNotMatch(seo, /queryKey: \['product'|ProductSeoRecord|\/products/);
 });
 
 test('Phase 13 structured data covers business, content and breadcrumbs', () => {
   const seo = read('frontend-user/src/seo/SeoManager.tsx');
-  for (const schema of ['LocalBusiness', 'Service', 'Product', 'Article', 'BreadcrumbList']) {
+  for (const schema of ['LocalBusiness', 'Service', 'Article', 'BreadcrumbList']) {
     assert.match(seo, new RegExp(schema));
   }
+  assert.doesNotMatch(seo, /@type': 'Product'/);
   assert.match(seo, /noindex,nofollow/);
 });
 
@@ -41,9 +42,10 @@ test('Phase 13 sitemap and robots are generated from environment and published A
   const sitemapGenerator = read('frontend-user/scripts/generate-sitemap.mjs');
   const robotsGenerator = read('frontend-user/scripts/generate-robots.mjs');
   assert.match(packageJson, /"prebuild": "npm run sitemap:generate && npm run robots:generate"/);
-  for (const endpoint of ['/services', '/projects', '/posts', '/products']) {
+  for (const endpoint of ['/services', '/projects', '/posts']) {
     assert.match(sitemapGenerator, new RegExp(endpoint));
   }
+  assert.doesNotMatch(sitemapGenerator, /endpoint: '\/products'|path: '\/products'/);
   assert.match(sitemapGenerator, /totalPages/);
   assert.match(sitemapGenerator, /SITEMAP_API_URL/);
   assert.match(robotsGenerator, /VITE_SITE_URL/);
@@ -68,7 +70,7 @@ test('Phase 13 measures mobile routes, desktop home and field web vitals', () =>
   for (const route of [
     'home / mobile',
     'services /services mobile',
-    'products /products mobile',
+    'projects /projects mobile',
     'articles /articles mobile',
     'booking /service-booking mobile',
     'home / desktop',

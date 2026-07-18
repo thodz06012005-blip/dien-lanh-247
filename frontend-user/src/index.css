@@ -120,12 +120,6 @@
     z-index: 0;
   }
 
-  /* Product stage: nền sản phẩm sạch, cao cấp */
-  .product-stage {
-    background: radial-gradient(ellipse 80% 70% at 50% 50%, #e8f0fd 0%, #f8fafc 70%);
-    border-radius: 2rem;
-  }
-
   /* Floating card: nổi, glass nhẹ */
   .floating-card {
     background: rgba(255, 255, 255, 0.92);
@@ -174,54 +168,6 @@
     color: #64748b;
     line-height: 1.75;
     max-width: 44ch;
-  }
-
-  /* Badge sale nổi bật */
-  .sale-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.2rem 0.5rem;
-    background: linear-gradient(135deg, #f97316, #ef4444);
-    color: white;
-    font-size: 0.6rem;
-    font-weight: 900;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    border-radius: 0.4rem;
-    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.35);
-  }
-
-  /* Card sản phẩm premium */
-  .product-card-premium {
-    background: #ffffff;
-    border: 1px solid #f1f5f9;
-    border-radius: 1.5rem;
-    box-shadow: 0 2px 12px rgba(6, 21, 39, 0.04), 0 1px 3px rgba(6, 21, 39, 0.03);
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    overflow: hidden;
-  }
-
-  .product-card-premium:hover {
-    border-color: #bfdbfe;
-    box-shadow:
-      0 20px 48px -12px rgba(37, 99, 235, 0.12),
-      0 4px 12px rgba(6, 21, 39, 0.06);
-    transform: translateY(-8px);
-  }
-
-  /* Category card premium */
-  .category-card-premium {
-    background: #ffffff;
-    border: 1px solid #f1f5f9;
-    border-radius: 1.5rem;
-    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-    cursor: pointer;
-  }
-
-  .category-card-premium:hover {
-    border-color: #dbeafe;
-    box-shadow: 0 16px 40px -12px rgba(37, 99, 235, 0.1);
-    transform: translateY(-5px);
   }
 
   /* Divider gradient */

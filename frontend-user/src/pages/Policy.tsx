@@ -5,9 +5,7 @@ import {
   CreditCard,
   FileCheck2,
   Lock,
-  RotateCcw,
   ShieldCheck,
-  Truck,
 } from 'lucide-react';
 import Breadcrumb from '@/components/common/Breadcrumb';
 import useDocumentTitle from '@/hooks/useDocumentTitle';
@@ -128,34 +126,13 @@ const policies: Record<string, PolicyDocument> = {
       },
     ],
   },
-  shipping: {
-    title: 'Chính sách giao nhận và lắp đặt',
-    summary: 'Quy định thời gian giao nhận, xác nhận địa điểm, vật tư và nghiệm thu khi giao lắp thiết bị.',
-    updatedAt: '14/07/2026',
-    icon: Truck,
-    sections: [
-      { heading: '1. Phạm vi giao nhận', paragraphs: ['Thời gian giao nhận phụ thuộc khu vực, tình trạng hàng hóa, điều kiện vận chuyển và lịch lắp đặt đã xác nhận.'] },
-      { heading: '2. Kiểm tra khi nhận', bullets: ['Kiểm tra model, số lượng và tình trạng bao bì.', 'Xác nhận vật tư phát sinh trước khi lắp đặt.', 'Chạy thử và ký nhận sau khi hoàn tất.'] },
-      { heading: '3. Thay đổi lịch', paragraphs: ['Khách hàng nên thông báo sớm khi cần đổi lịch. Các trường hợp không bảo đảm an toàn thi công có thể được hẹn lại.'] },
-    ],
-  },
-  return: {
-    title: 'Chính sách đổi trả sản phẩm',
-    summary: 'Điều kiện tiếp nhận đổi trả đối với sản phẩm do Điện Lạnh 247 cung cấp.',
-    updatedAt: '14/07/2026',
-    icon: RotateCcw,
-    sections: [
-      { heading: '1. Điều kiện tiếp nhận', bullets: ['Sản phẩm thuộc đơn hàng hợp lệ.', 'Tình trạng, phụ kiện và chứng từ được giữ đầy đủ.', 'Yêu cầu được gửi trong thời hạn áp dụng của từng nhóm sản phẩm.'] },
-      { heading: '2. Quy trình xác minh', paragraphs: ['Đội ngũ tiếp nhận thông tin, kiểm tra tình trạng và phối hợp nhà sản xuất hoặc nhà cung cấp khi cần. Kết quả được thông báo trước khi thực hiện đổi hoặc hoàn trả.'] },
-    ],
-  },
   payment: {
     title: 'Chính sách thanh toán',
-    summary: 'Các phương thức thanh toán và nguyên tắc xác nhận chi phí cho sản phẩm, vật tư và dịch vụ.',
+    summary: 'Các phương thức thanh toán và nguyên tắc xác nhận chi phí cho báo giá, vật tư thay thế và dịch vụ.',
     updatedAt: '14/07/2026',
     icon: CreditCard,
     sections: [
-      { heading: '1. Phương thức', bullets: ['Tiền mặt sau khi nghiệm thu.', 'Chuyển khoản theo thông tin xác nhận chính thức.', 'Phương thức khác nếu được ghi rõ trên đơn hàng hoặc hợp đồng.'] },
+      { heading: '1. Phương thức', bullets: ['Tiền mặt sau khi nghiệm thu.', 'Chuyển khoản theo thông tin xác nhận chính thức.', 'Phương thức khác nếu được ghi rõ trên báo giá hoặc hợp đồng dịch vụ.'] },
       { heading: '2. Xác nhận chi phí', paragraphs: ['Mọi chi phí phát sinh cần được thông báo và đồng ý trước khi thực hiện. Khách hàng nên lưu chứng từ hoặc xác nhận thanh toán để đối chiếu khi cần.'] },
     ],
   },
@@ -165,8 +142,6 @@ const policyNavigation = [
   { slug: 'warranty', label: 'Bảo hành' },
   { slug: 'privacy', label: 'Bảo mật' },
   { slug: 'terms', label: 'Điều khoản' },
-  { slug: 'shipping', label: 'Giao nhận' },
-  { slug: 'return', label: 'Đổi trả' },
   { slug: 'payment', label: 'Thanh toán' },
 ];
 
@@ -250,7 +225,7 @@ export default function Policy() {
 
             <div className="mt-12 rounded-2xl border border-blue-100 bg-blue-50 p-6">
               <h2 className="text-lg font-black text-slate-950">Cần giải thích thêm?</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Gửi câu hỏi kèm mã đơn hàng hoặc mã yêu cầu để được kiểm tra chính xác theo trường hợp thực tế.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Gửi câu hỏi kèm mã yêu cầu dịch vụ để được kiểm tra chính xác theo trường hợp thực tế.</p>
               <Link to="/contact" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-primary-600 px-5 text-sm font-black text-white">Liên hệ hỗ trợ</Link>
             </div>
           </div>

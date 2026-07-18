@@ -65,13 +65,11 @@ test('frontend session is cookie-backed and protected routes are guarded', () =>
   assert.match(router, /path="my-services\/:id"/);
 });
 
-test('customer pages no longer use phone-only order ownership', () => {
-  const orders = read('frontend-user/src/pages/Orders.tsx');
+test('service-only customer pages remove orders and retain JWT-owned service history', () => {
   const services = read('frontend-user/src/pages/MyServices.tsx');
-  assert.match(orders, /\/account\/orders/);
-  assert.doesNotMatch(orders, /params:\s*\{\s*phone/);
-  assert.doesNotMatch(orders, /phoneLookup|activePhone/);
+  assert.equal(existsSync(resolve(root, 'frontend-user/src/pages/Orders.tsx')), false);
   assert.match(services, /\/account\/service-requests/);
+  assert.doesNotMatch(services, /params:\s*\{\s*phone|phoneLookup|activePhone/);
 });
 
 test('password and verification links are not logged by mail service', () => {

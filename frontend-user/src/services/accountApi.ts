@@ -32,7 +32,6 @@ export interface AccountOverview {
   defaultAddress: Address | null;
   stats: {
     services: number;
-    orders: number;
     unreadNotifications: number;
     activeSessions: number;
   };
@@ -75,7 +74,6 @@ export const updateAddress = async (id: number, payload: Omit<Address, 'id' | 'c
 export const deleteAddress = async (id: number) => (await api.delete(`/account/addresses/${id}`)).data.data;
 export const changePassword = async (payload: { currentPassword: string; newPassword: string }) =>
   (await api.post('/account/change-password', payload)).data.data;
-export const listAccountOrders = async () => (await api.get('/account/orders')).data.data;
 export const listAccountServiceRequests = async () => (await api.get('/account/service-requests')).data.data;
 export const claimServiceRequest = async (payload: { code: string; phone: string }) =>
   (await api.post('/account/service-requests/claim', payload)).data.data;

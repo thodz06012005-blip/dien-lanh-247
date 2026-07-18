@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { OrderStatus, TechnicianStatus } from '@prisma/client';
 import { PrismaService } from '../../core/database/prisma.service';
 
@@ -29,9 +30,15 @@ interface ServiceAttentionRow {
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
   async getDashboardStats() {
+    if (this.config.get<boolean>('SERVICE_ONLY_MODE', true)) {
+      return this.getServiceOnlyDashboardStats();
+    }
     const now = new Date();
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
@@ -207,6 +214,67 @@ export class DashboardService {
           stock: variant.stock,
           thumbnail: variant.product.images[0]?.url ?? null,
         })),
+      },
+    };
+  }
+
+  private async getServiceOnlyDashboardStats() {
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const [openServiceRows, activeTechnicians, newCustomers, serviceStatusRows, urgentServiceRequests] = await Promise.all([
+      this.prisma.$queryRawUnsafe<CountRow[]>(
+        `SELECT COUNT(*) AS total FROM ServiceRequest
+         WHERE workflowStatus NOT IN ('COMPLETED', 'CLOSED', 'CANCELLED', 'REJECTED')`,
+      ),
+      this.prisma.technician.count({
+        where: { status: { in: [TechnicianStatus.available, TechnicianStatus.busy] } },
+      }),
+      this.prisma.user.count({ where: { role: 'CUSTOMER', createdAt: { gte: todayStart } } }),
+      this.prisma.$queryRawUnsafe<StatusRow[]>(
+        `SELECT workflowStatus AS status, COUNT(*) AS total
+         FROM ServiceRequest GROUP BY workflowStatus ORDER BY total DESC`,
+      ),
+      this.prisma.$queryRawUnsafe<ServiceAttentionRow[]>(
+        `SELECT id, customerName, applianceType, workflowStatus, priority, createdAt, scheduledAt
+         FROM ServiceRequest
+         WHERE priority = 'urgent'
+           AND workflowStatus NOT IN ('COMPLETED', 'CLOSED', 'CANCELLED', 'REJECTED')
+         ORDER BY createdAt ASC LIMIT 12`,
+      ),
+    ]);
+    const attention = urgentServiceRequests.map((request) => ({
+      id: `service:${request.id}`,
+      type: 'urgent_service',
+      severity: 'critical',
+      title: `Yêu cầu khẩn ${request.id}`,
+      description: `${request.customerName} · ${request.applianceType}`,
+      href: `/service-requests/${request.id}`,
+      createdAt: request.createdAt,
+      dueAt: request.scheduledAt,
+    }));
+    return {
+      success: true,
+      data: {
+        generatedAt: now.toISOString(),
+        kpis: {
+          todayRevenue: 0,
+          totalOrders: 0,
+          pendingOrders: 0,
+          newCustomers,
+          totalProducts: 0,
+          openServiceRequests: Number(openServiceRows[0]?.total ?? 0),
+          activeTechnicians,
+          lowStockVariants: 0,
+        },
+        charts: {
+          revenue7d: [],
+          orderStatus: [],
+          serviceStatus: serviceStatusRows.map((row) => ({ status: row.status, total: Number(row.total) })),
+        },
+        attention,
+        recentOrders: [],
+        lowStock: [],
       },
     };
   }

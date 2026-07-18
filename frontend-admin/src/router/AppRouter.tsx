@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { HashRouter, Route, Routes } from 'react-router-dom';
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ADMIN_PERMISSIONS } from '@/config/adminPermissions';
+import { env } from '@/config/env';
 import AdminLayout from '@/layouts/AdminLayout';
 import AdminProfile from '@/pages/AdminProfile';
 import Customers from '@/pages/Customers';
@@ -39,8 +40,17 @@ export default function AppRouter() {
             <Route path="operations" element={<ProtectedPage permission={ADMIN_PERMISSIONS.OPERATIONS_VIEW}><Operations /></ProtectedPage>} />
             <Route path="notifications" element={<ProtectedPage permission={ADMIN_PERMISSIONS.OPERATIONS_VIEW}><Notifications /></ProtectedPage>} />
             <Route path="content" element={<ProtectedPage permission={ADMIN_PERMISSIONS.CONTENT_VIEW}><EditorialCms /></ProtectedPage>} />
-            <Route path="products" element={<ProtectedPage permission={ADMIN_PERMISSIONS.PRODUCTS_VIEW}><Products /></ProtectedPage>} />
-            <Route path="orders" element={<ProtectedPage permission={ADMIN_PERMISSIONS.ORDERS_VIEW}><Orders /></ProtectedPage>} />
+            {env.serviceOnlyMode ? (
+              <>
+                <Route path="products/*" element={<Navigate to="/operations" replace />} />
+                <Route path="orders/*" element={<Navigate to="/operations" replace />} />
+              </>
+            ) : (
+              <>
+                <Route path="products" element={<ProtectedPage permission={ADMIN_PERMISSIONS.PRODUCTS_VIEW}><Products /></ProtectedPage>} />
+                <Route path="orders" element={<ProtectedPage permission={ADMIN_PERMISSIONS.ORDERS_VIEW}><Orders /></ProtectedPage>} />
+              </>
+            )}
             <Route path="customers" element={<ProtectedPage permission={ADMIN_PERMISSIONS.CUSTOMERS_VIEW}><Customers /></ProtectedPage>} />
             <Route path="settings" element={<ProtectedPage permission={ADMIN_PERMISSIONS.SETTINGS_VIEW}><Settings /></ProtectedPage>} />
             <Route path="service-requests" element={<ProtectedPage permission={ADMIN_PERMISSIONS.SERVICES_VIEW}><ServiceRequests /></ProtectedPage>} />

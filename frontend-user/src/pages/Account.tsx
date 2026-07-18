@@ -3,13 +3,11 @@ import {
   Bell,
   CheckCircle2,
   ChevronRight,
-  ClipboardList,
   KeyRound,
   Laptop,
   Link2,
   LogOut,
   MapPin,
-  Package,
   Plus,
   Save,
   ShieldCheck,
@@ -30,7 +28,6 @@ import {
   createAddress,
   deleteAddress,
   getAccountOverview,
-  listAccountOrders,
   listAccountServiceRequests,
   listAddresses,
   listNotifications,
@@ -48,16 +45,7 @@ import api, { getApiErrorMessage } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { useToastStore } from '@/store/toastStore';
 
-type Tab = 'overview' | 'profile' | 'addresses' | 'services' | 'orders' | 'notifications' | 'security';
-
-interface AccountOrder {
-  id: number;
-  orderNumber: string;
-  status: string;
-  totalAmount: number | string;
-  createdAt: string;
-  items?: Array<{ id: number; productName: string; quantity: number }>;
-}
+type Tab = 'overview' | 'profile' | 'addresses' | 'services' | 'notifications' | 'security';
 
 interface AccountServiceRequest {
   id: string;
@@ -81,7 +69,6 @@ const tabs: TabItem[] = [
   { id: 'profile', label: 'Hồ sơ cá nhân', icon: User },
   { id: 'addresses', label: 'Sổ địa chỉ', icon: MapPin },
   { id: 'services', label: 'Lịch sử dịch vụ', icon: Wrench },
-  { id: 'orders', label: 'Đơn hàng', icon: Package },
   { id: 'notifications', label: 'Thông báo', icon: Bell },
   { id: 'security', label: 'Bảo mật & thiết bị', icon: KeyRound },
 ];
@@ -110,7 +97,6 @@ export default function Account() {
   const overviewQuery = useQuery({ queryKey: ['account-overview'], queryFn: getAccountOverview });
   const addressesQuery = useQuery({ queryKey: ['account-addresses'], queryFn: listAddresses, enabled: activeTab === 'addresses' || activeTab === 'overview' });
   const servicesQuery = useQuery({ queryKey: ['account-services'], queryFn: listAccountServiceRequests, enabled: activeTab === 'services' || activeTab === 'overview' });
-  const ordersQuery = useQuery({ queryKey: ['account-orders'], queryFn: listAccountOrders, enabled: activeTab === 'orders' || activeTab === 'overview' });
   const notificationsQuery = useQuery({ queryKey: ['account-notifications'], queryFn: listNotifications, enabled: activeTab === 'notifications' || activeTab === 'overview' });
   const sessionsQuery = useQuery({ queryKey: ['account-sessions'], queryFn: listSessions, enabled: activeTab === 'security' || activeTab === 'overview' });
 
@@ -127,7 +113,7 @@ export default function Account() {
   }, [overviewQuery.data?.user, user]);
 
   const refreshAccount = () => {
-    for (const key of ['account-overview', 'account-addresses', 'account-services', 'account-orders', 'account-notifications', 'account-sessions']) {
+    for (const key of ['account-overview', 'account-addresses', 'account-services', 'account-notifications', 'account-sessions']) {
       void queryClient.invalidateQueries({ queryKey: [key] });
     }
   };
@@ -176,7 +162,6 @@ export default function Account() {
   const notifications = notificationsQuery.data || [];
   const unread = notifications.filter((item) => !item.readAt).length;
   const recentServices = useMemo(() => (servicesQuery.data || []).slice(0, 3) as AccountServiceRequest[], [servicesQuery.data]);
-  const recentOrders = useMemo(() => (ordersQuery.data || []).slice(0, 3) as AccountOrder[], [ordersQuery.data]);
 
   const handleLogout = async () => {
     try { await api.post('/auth/logout'); } catch { /* session may already be expired */ }
@@ -217,7 +202,7 @@ export default function Account() {
         </aside>
 
         <main className="min-w-0">
-          {activeTab === 'overview' && <Overview account={account} recentServices={recentServices} recentOrders={recentOrders} notifications={notifications.slice(0, 3)} onTab={(tab) => setSearchParams({ tab })} />}
+          {activeTab === 'overview' && <Overview account={account} recentServices={recentServices} notifications={notifications.slice(0, 3)} onTab={(tab) => setSearchParams({ tab })} />}
           {activeTab === 'profile' && (
             <Panel title="Hồ sơ cá nhân" subtitle="Thông tin dùng để điền nhanh biểu mẫu và xác minh quyền sở hữu.">
               {!accountUser.emailVerified && <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-amber-100 bg-amber-50 p-5 sm:flex-row sm:items-center sm:justify-between"><div><strong className="text-amber-950">Email chưa được xác minh</strong><p className="mt-1 text-sm text-amber-800">Xác minh email để tự động liên kết các yêu cầu cũ.</p></div><Button variant="outline" onClick={async () => { try { await api.post('/auth/verify-email/resend'); showSuccess('Đã gửi lại email xác minh.'); } catch (error) { showError(getApiErrorMessage(error)); } }}>Gửi lại email</Button></div>}
@@ -228,7 +213,6 @@ export default function Account() {
           )}
           {activeTab === 'addresses' && <AddressesTab addresses={addressesQuery.data || []} form={addressForm} setForm={setAddressForm} addPending={addressMutation.isPending} deletePending={deleteAddressMutation.isPending} onAdd={() => addressMutation.mutate()} onDelete={(id) => deleteAddressMutation.mutate(id)} />}
           {activeTab === 'services' && <ServicesTab requests={(servicesQuery.data || []) as AccountServiceRequest[]} claim={claim} setClaim={setClaim} pending={claimMutation.isPending} onClaim={() => claimMutation.mutate()} onOpen={(id) => navigate(`/my-services/${id}`)} />}
-          {activeTab === 'orders' && <OrdersTab orders={(ordersQuery.data || []) as AccountOrder[]} />}
           {activeTab === 'notifications' && <NotificationsTab notifications={notifications} onRead={async (id) => { await markNotificationRead(id); void notificationsQuery.refetch(); refreshAccount(); }} onReadAll={async () => { await markAllNotificationsRead(); void notificationsQuery.refetch(); refreshAccount(); }} />}
           {activeTab === 'security' && <SecurityTab password={password} setPassword={setPassword} sessions={sessionsQuery.data || []} passwordPending={passwordMutation.isPending} revokePending={revokeMutation.isPending} onPassword={() => { if (password.newPassword !== password.confirmPassword) { showError('Mật khẩu xác nhận không khớp'); return; } passwordMutation.mutate(); }} onRevoke={(session) => revokeMutation.mutate(session)} />}
         </main>
@@ -253,26 +237,21 @@ function Empty({ icon: Icon, title, body }: { icon: LucideIcon; title: string; b
   return <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center"><Icon className="mx-auto h-8 w-8 text-slate-300" /><strong className="mt-3 block text-sm text-slate-700">{title}</strong><p className="mt-1 text-xs leading-5 text-slate-500">{body}</p></div>;
 }
 
-function Overview({ account, recentServices, recentOrders, notifications, onTab }: { account?: AccountOverview; recentServices: AccountServiceRequest[]; recentOrders: AccountOrder[]; notifications: AccountNotification[]; onTab: (tab: Tab) => void }) {
+function Overview({ account, recentServices, notifications, onTab }: { account?: AccountOverview; recentServices: AccountServiceRequest[]; notifications: AccountNotification[]; onTab: (tab: Tab) => void }) {
   const cards: Array<{ icon: LucideIcon; label: string; value: number; tab: Tab }> = [
     { icon: Wrench, label: 'Dịch vụ', value: account?.stats.services || 0, tab: 'services' },
-    { icon: Package, label: 'Đơn hàng', value: account?.stats.orders || 0, tab: 'orders' },
     { icon: Bell, label: 'Chưa đọc', value: account?.stats.unreadNotifications || 0, tab: 'notifications' },
     { icon: Laptop, label: 'Phiên hoạt động', value: account?.stats.activeSessions || 0, tab: 'security' },
   ];
-  return <div className="space-y-6"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(({ icon: Icon, label, value, tab }) => <button type="button" key={label} onClick={() => onTab(tab)} className="rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-primary-600"><Icon className="h-5 w-5" /></div><strong className="mt-5 block text-3xl font-black text-slate-950">{value}</strong><span className="text-sm font-bold text-slate-500">{label}</span></button>)}</div><div className="grid gap-6 xl:grid-cols-2"><Panel title="Dịch vụ gần đây" subtitle="Các yêu cầu mới nhất của tài khoản.">{recentServices.length ? recentServices.map((item) => <div key={item.id} className="mb-3 rounded-2xl bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><strong className="font-mono text-xs">{item.id}</strong><StatusBadge value={item.status} /></div><p className="mt-2 text-sm font-bold text-slate-700">{item.serviceCategoryName}</p></div>) : <Empty icon={Wrench} title="Chưa có dịch vụ" body="Liên kết yêu cầu cũ hoặc tạo lịch mới." />}</Panel><Panel title="Đơn hàng gần đây" subtitle="Đơn mua sản phẩm và vật tư.">{recentOrders.length ? recentOrders.map((item) => <div key={item.id} className="mb-3 flex items-center justify-between rounded-2xl bg-slate-50 p-4"><div><strong className="font-mono text-xs">{item.orderNumber}</strong><p className="mt-1 text-xs text-slate-400">{formatDate(item.createdAt)}</p></div><strong className="text-sm text-primary-700">{formatMoney(item.totalAmount)}</strong></div>) : <Empty icon={ClipboardList} title="Chưa có đơn hàng" body="Đơn hàng của bạn sẽ xuất hiện tại đây." />}</Panel></div><Panel title="Thông báo mới" subtitle="Các cập nhật gần nhất liên quan đến tài khoản.">{notifications.length ? notifications.map((item) => <div key={String(item.id)} className="mb-3 rounded-2xl border border-slate-100 p-4"><strong className="text-sm">{item.title}</strong><p className="mt-1 text-sm text-slate-500">{item.body}</p></div>) : <Empty icon={Bell} title="Không có thông báo mới" body="Bạn đã cập nhật hết thông tin." />}</Panel></div>;
+  return <div className="space-y-6"><div className="grid gap-4 sm:grid-cols-3">{cards.map(({ icon: Icon, label, value, tab }) => <button type="button" key={label} onClick={() => onTab(tab)} className="rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg motion-reduce:transform-none"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-primary-600"><Icon className="h-5 w-5" /></div><strong className="mt-5 block text-3xl font-black text-slate-950">{value}</strong><span className="text-sm font-bold text-slate-500">{label}</span></button>)}</div><Panel title="Dịch vụ gần đây" subtitle="Các yêu cầu mới nhất của tài khoản.">{recentServices.length ? recentServices.map((item) => <div key={item.id} className="mb-3 rounded-2xl bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><strong className="font-mono text-xs">{item.id}</strong><StatusBadge value={item.status} /></div><p className="mt-2 text-sm font-bold text-slate-700">{item.serviceCategoryName}</p></div>) : <Empty icon={Wrench} title="Chưa có dịch vụ" body="Liên kết yêu cầu cũ hoặc tạo lịch mới." />}</Panel><Panel title="Thông báo mới" subtitle="Các cập nhật gần nhất liên quan đến tài khoản.">{notifications.length ? notifications.map((item) => <div key={String(item.id)} className="mb-3 rounded-2xl border border-slate-100 p-4"><strong className="text-sm">{item.title}</strong><p className="mt-1 text-sm text-slate-500">{item.body}</p></div>) : <Empty icon={Bell} title="Không có thông báo mới" body="Bạn đã cập nhật hết thông tin." />}</Panel></div>;
 }
 
 function AddressesTab({ addresses, form, setForm, addPending, deletePending, onAdd, onDelete }: { addresses: Address[]; form: Omit<Address, 'id' | 'createdAt' | 'updatedAt'>; setForm: (value: Omit<Address, 'id' | 'createdAt' | 'updatedAt'>) => void; addPending: boolean; deletePending: boolean; onAdd: () => void; onDelete: (id: number) => void }) {
-  return <div className="space-y-6"><Panel title="Sổ địa chỉ" subtitle="Lưu nhiều địa chỉ; dữ liệu chỉ được trả về cho chủ tài khoản."><div className="grid gap-4 md:grid-cols-2">{addresses.map((address) => <article key={address.id} className="rounded-2xl border border-slate-200 p-5"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><strong className="text-sm text-slate-950">{address.label}</strong>{Boolean(address.isDefault) && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">MẶC ĐỊNH</span>}</div><p className="mt-3 text-sm font-bold text-slate-700">{address.fullName} · {address.phone}</p><p className="mt-1 text-sm leading-6 text-slate-500">{address.streetAddress}, {address.ward}, {address.district}, {address.province}</p></div><button type="button" disabled={deletePending} onClick={() => onDelete(address.id)} className="rounded-xl p-2 text-red-500 hover:bg-red-50" aria-label="Xóa địa chỉ"><Trash2 className="h-4 w-4" /></button></div></article>)}{!addresses.length && <Empty icon={MapPin} title="Chưa có địa chỉ" body="Thêm địa chỉ đầu tiên để rút ngắn quá trình đặt hàng và đặt dịch vụ." />}</div></Panel><Panel title="Thêm địa chỉ mới" subtitle="Địa chỉ đầu tiên sẽ tự động trở thành mặc định."><div className="grid gap-4 sm:grid-cols-2"><Input label="Nhãn địa chỉ" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} /><Input label="Người nhận" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /><Input label="Số điện thoại" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /><Input label="Tỉnh / Thành phố" value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} /><Input label="Quận / Huyện" value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} /><Input label="Phường / Xã" value={form.ward} onChange={(e) => setForm({ ...form, ward: e.target.value })} /></div><div className="mt-4 grid gap-4"><Input label="Địa chỉ chi tiết" value={form.streetAddress} onChange={(e) => setForm({ ...form, streetAddress: e.target.value })} /><Input label="Ghi chú giao nhận" value={form.note || ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div><label className="mt-4 flex items-center gap-2 text-sm font-bold text-slate-600"><input type="checkbox" checked={Boolean(form.isDefault)} onChange={(e) => setForm({ ...form, isDefault: e.target.checked })} />Đặt làm địa chỉ mặc định</label><div className="mt-6 flex justify-end"><Button leftIcon={<Plus className="h-4 w-4" />} isLoading={addPending} onClick={onAdd}>Thêm địa chỉ</Button></div></Panel></div>;
+  return <div className="space-y-6"><Panel title="Sổ địa chỉ" subtitle="Lưu nhiều địa chỉ; dữ liệu chỉ được trả về cho chủ tài khoản."><div className="grid gap-4 md:grid-cols-2">{addresses.map((address) => <article key={address.id} className="rounded-2xl border border-slate-200 p-5"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><strong className="text-sm text-slate-950">{address.label}</strong>{Boolean(address.isDefault) && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700">MẶC ĐỊNH</span>}</div><p className="mt-3 text-sm font-bold text-slate-700">{address.fullName} · {address.phone}</p><p className="mt-1 text-sm leading-6 text-slate-500">{address.streetAddress}, {address.ward}, {address.district}, {address.province}</p></div><button type="button" disabled={deletePending} onClick={() => onDelete(address.id)} className="rounded-xl p-2 text-red-500 hover:bg-red-50" aria-label="Xóa địa chỉ"><Trash2 className="h-4 w-4" /></button></div></article>)}{!addresses.length && <Empty icon={MapPin} title="Chưa có địa chỉ" body="Thêm địa chỉ đầu tiên để rút ngắn quá trình đặt lịch dịch vụ." />}</div></Panel><Panel title="Thêm địa chỉ mới" subtitle="Địa chỉ đầu tiên sẽ tự động trở thành mặc định."><div className="grid gap-4 sm:grid-cols-2"><Input label="Nhãn địa chỉ" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} /><Input label="Người liên hệ" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /><Input label="Số điện thoại" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /><Input label="Tỉnh / Thành phố" value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} /><Input label="Quận / Huyện" value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} /><Input label="Phường / Xã" value={form.ward} onChange={(e) => setForm({ ...form, ward: e.target.value })} /></div><div className="mt-4 grid gap-4"><Input label="Địa chỉ chi tiết" value={form.streetAddress} onChange={(e) => setForm({ ...form, streetAddress: e.target.value })} /><Input label="Ghi chú phục vụ" value={form.note || ''} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div><label className="mt-4 flex items-center gap-2 text-sm font-bold text-slate-600"><input type="checkbox" checked={Boolean(form.isDefault)} onChange={(e) => setForm({ ...form, isDefault: e.target.checked })} />Đặt làm địa chỉ mặc định</label><div className="mt-6 flex justify-end"><Button leftIcon={<Plus className="h-4 w-4" />} isLoading={addPending} onClick={onAdd}>Thêm địa chỉ</Button></div></Panel></div>;
 }
 
 function ServicesTab({ requests, claim, setClaim, pending, onClaim, onOpen }: { requests: AccountServiceRequest[]; claim: { code: string; phone: string }; setClaim: (value: { code: string; phone: string }) => void; pending: boolean; onClaim: () => void; onOpen: (id: string) => void }) {
   return <div className="space-y-6"><Panel title="Lịch sử dịch vụ" subtitle="Chỉ các yêu cầu đã liên kết với tài khoản mới xuất hiện."><div className="space-y-3">{requests.map((request) => <button key={request.id} type="button" onClick={() => onOpen(request.id)} className="flex w-full flex-col gap-3 rounded-2xl border border-slate-200 p-5 text-left transition hover:border-primary-200 hover:shadow-md sm:flex-row sm:items-center"><div className="flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="font-mono text-sm text-slate-950">{request.id}</strong><StatusBadge value={request.status} /></div><p className="mt-2 text-sm font-bold text-slate-700">{request.serviceCategoryName} · {request.applianceType}</p><p className="mt-1 text-xs text-slate-400">Lịch mong muốn: {request.preferredDate}</p></div><strong className="text-sm text-primary-700">{formatMoney(request.finalPrice)}</strong></button>)}{!requests.length && <Empty icon={Wrench} title="Chưa có yêu cầu được liên kết" body="Xác nhận một yêu cầu cũ bằng mã và số điện thoại." />}</div></Panel><Panel title="Liên kết yêu cầu đã tạo trước đây" subtitle="Mã và số điện thoại phải khớp chính xác."><div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]"><Input label="Mã yêu cầu" value={claim.code} onChange={(e) => setClaim({ ...claim, code: e.target.value.toUpperCase() })} placeholder="DL247-..." /><Input label="Số điện thoại" value={claim.phone} onChange={(e) => setClaim({ ...claim, phone: e.target.value })} /><Button className="self-end" leftIcon={<Link2 className="h-4 w-4" />} isLoading={pending} onClick={onClaim}>Liên kết</Button></div></Panel></div>;
-}
-
-function OrdersTab({ orders }: { orders: AccountOrder[] }) {
-  return <Panel title="Lịch sử đơn hàng" subtitle="API xác định chủ sở hữu bằng userId trong JWT."><div className="space-y-3">{orders.map((order) => <div key={order.id} className="flex flex-col gap-4 rounded-2xl border border-slate-200 p-5 sm:flex-row sm:items-center"><div className="flex-1"><div className="flex items-center gap-2"><strong className="font-mono text-sm">{order.orderNumber}</strong><StatusBadge value={order.status} /></div><p className="mt-2 text-xs text-slate-400">{formatDate(order.createdAt)} · {order.items?.length || 0} dòng sản phẩm</p></div><strong className="text-primary-700">{formatMoney(order.totalAmount)}</strong></div>)}{!orders.length && <Empty icon={Package} title="Chưa có đơn hàng" body="Các đơn hàng của đúng tài khoản sẽ xuất hiện tại đây." />}</div></Panel>;
 }
 
 function NotificationsTab({ notifications, onRead, onReadAll }: { notifications: AccountNotification[]; onRead: (id: string | number) => Promise<void>; onReadAll: () => Promise<void> }) {

@@ -16,9 +16,10 @@ test('public router uses crawlable URLs and route-aware SEO', () => {
 
 test('SEO manager provides canonical, Open Graph, robots and structured data', () => {
   const seo = read('src/seo/SeoManager.tsx');
-  for (const marker of ['canonical', 'og:title', 'og:description', 'BreadcrumbList', 'LocalBusiness', 'Service', 'Product', 'Article']) {
+  for (const marker of ['canonical', 'og:title', 'og:description', 'BreadcrumbList', 'LocalBusiness', 'Service', 'Article']) {
     assert.match(seo, new RegExp(marker));
   }
+  assert.doesNotMatch(seo, /ProductSeoRecord|@type': 'Product'|\/products/);
 });
 
 test('robots and sitemap contain production URLs only', () => {
