@@ -8,19 +8,34 @@ const {
   validateSortStrict,
   validateAllowedQueryKeys,
   validateSearchQuery,
-  sendValidationError
+  sendValidationError,
 } = require('../utils/validation');
 
 // GET /admin/customers — requires: customers:read (superadmin, admin)
 router.get('/admin/customers', requirePermission('customers:read'), (req, res) => {
   const errors = [];
-  
-  validateAllowedQueryKeys(req.query, [
-    'page', 'limit', 'q', 'search', 'sortBy', 'sortOrder'
-  ], errors);
+
+  validateAllowedQueryKeys(
+    req.query,
+    ['page', 'limit', 'q', 'search', 'sortBy', 'sortOrder'],
+    errors,
+  );
 
   validatePaginationStrict(req.query, errors);
-  validateSortStrict(req.query, ['name', 'phone', 'email', 'orderCount', 'totalOrders', 'totalSpent', 'createdAt'], errors);
+  validateSortStrict(
+    req.query,
+    [
+      'name',
+      'phone',
+      'email',
+      'serviceRequestCount',
+      'completedServiceCount',
+      'serviceRevenue',
+      'lastServiceAt',
+      'createdAt',
+    ],
+    errors,
+  );
 
   if (req.query.q !== undefined) validateSearchQuery(req.query, 'q', errors, 100);
   if (req.query.search !== undefined) validateSearchQuery(req.query, 'search', errors, 100);

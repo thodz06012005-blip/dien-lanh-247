@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 
 const userUrl = (process.env.USER_SMOKE_URL || 'https://dienlanh247.local').replace(/\/$/, '');
-const adminUrl = (process.env.ADMIN_SMOKE_URL || 'https://admin.dienlanh247.local').replace(/\/$/, '');
+const adminUrl = (process.env.ADMIN_SMOKE_URL || 'https://admin.dienlanh247.local').replace(
+  /\/$/,
+  '',
+);
 const apiUrl = (process.env.API_SMOKE_URL || `${userUrl}/api/v1`).replace(/\/$/, '');
 const timeoutMs = Number(process.env.SMOKE_TIMEOUT_MS || 15_000);
 
@@ -18,6 +21,9 @@ async function get(url, options = {}) {
 const live = await get(`${apiUrl}/health/live`, { accept: 'application/json' });
 assert.equal(live.response.status, 200);
 assert.match(live.body, /"status":"ok"/);
+assert.match(live.body, /"mode":"service-only"/);
+assert.match(live.body, /"contractVersion":"service-only-v1"/);
+assert.match(live.body, /"commerce":false/);
 
 const ready = await get(`${apiUrl}/health/ready`, { accept: 'application/json' });
 assert.equal(ready.response.status, 200);

@@ -210,13 +210,12 @@ export class OperationsService {
       userId,
     );
     if (!users.length) throw new NotFoundException('Không tìm thấy khách hàng');
-    const [addresses, devices, requests, orders] = await Promise.all([
+    const [addresses, devices, requests] = await Promise.all([
       this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(`SELECT * FROM Address WHERE userId = ? ORDER BY isDefault DESC, id DESC`, userId),
       this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(`SELECT * FROM CustomerDevice WHERE userId = ? ORDER BY isActive DESC, updatedAt DESC`, userId),
       this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(`SELECT id, serviceCategoryId, applianceType, issueDescription, workflowStatus, priority, preferredDate, preferredTimeSlot, assignedTechnicianId, finalPrice, paymentStatus, createdAt, updatedAt FROM ServiceRequest WHERE customerUserId = ? ORDER BY createdAt DESC LIMIT 100`, userId),
-      this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(`SELECT id, orderNumber, totalAmount, status, createdAt FROM \`Order\` WHERE userId = ? ORDER BY createdAt DESC LIMIT 100`, userId),
     ]);
-    return { customer: users[0], addresses, devices, serviceRequests: requests, orders };
+    return { customer: users[0], addresses, devices, serviceRequests: requests };
   }
 
   async createDevice(dto: CustomerDeviceDto, actor: OperationsActor) {

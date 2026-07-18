@@ -117,15 +117,11 @@ export class UsersService {
   async getOverview(userId: number) {
     const user = await this.getAccountRow(userId);
     await this.linkEligibleRequests(user);
-    const serviceOnlyMode = this.configService.get<boolean>('SERVICE_ONLY_MODE', true);
     const [addresses, stats, unreadRows, sessions] = await Promise.all([
       this.listAddresses(userId),
-      this.prisma.$queryRawUnsafe<Array<{ serviceCount: bigint; orderCount: bigint }>>(
-        `SELECT
-          (SELECT COUNT(*) FROM ServiceRequest WHERE customerUserId = ?) AS serviceCount,
-          ${serviceOnlyMode ? '0' : '(SELECT COUNT(*) FROM `Order` WHERE userId = ?)'} AS orderCount`,
+      this.prisma.$queryRawUnsafe<Array<{ serviceCount: bigint }>>(
+        'SELECT COUNT(*) AS serviceCount FROM ServiceRequest WHERE customerUserId = ?',
         userId,
-        ...(!serviceOnlyMode ? [userId] : []),
       ),
       this.prisma.$queryRawUnsafe<Array<{ total: bigint }>>(
         'SELECT COUNT(*) AS total FROM CustomerNotification WHERE userId = ? AND readAt IS NULL',
@@ -141,7 +137,6 @@ export class UsersService {
       defaultAddress: addresses.find((address) => Boolean(address.isDefault)) ?? addresses[0] ?? null,
       stats: {
         services: Number(stats[0]?.serviceCount ?? 0),
-        orders: Number(stats[0]?.orderCount ?? 0),
         unreadNotifications: Number(unreadRows[0]?.total ?? 0),
         activeSessions: Number(sessions[0]?.total ?? 0),
       },
@@ -254,8 +249,6 @@ export class UsersService {
 
   async deleteAddress(userId: number, addressId: number) {
     const address = await this.getAddressOwned(userId, addressId);
-    const inUse = await this.prisma.order.count({ where: { addressId, userId } });
-    if (inUse > 0) throw new ConflictException('Không thể xóa địa chỉ đã được dùng trong đơn hàng');
     await this.prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe('DELETE FROM Address WHERE id = ? AND userId = ?', addressId, userId);
       if (Boolean(address.isDefault)) {
@@ -295,54 +288,6 @@ export class UsersService {
       userId,
     );
     return { changed: true, requiresLogin: true };
-  }
-
-  async listOrders(userId: number) {
-    await this.getAccountRow(userId);
-    return this.prisma.order.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      select: {
-        id: true,
-        orderNumber: true,
-        subtotal: true,
-        shippingFee: true,
-        discount: true,
-        totalAmount: true,
-        status: true,
-        note: true,
-        createdAt: true,
-        updatedAt: true,
-        payment: { select: { method: true, status: true, amount: true, paidAt: true } },
-        shipping: { select: { carrier: true, trackingNumber: true, status: true, estimatedDate: true, deliveredAt: true } },
-        items: { select: { id: true, productName: true, variantName: true, price: true, quantity: true } },
-      },
-    });
-  }
-
-  async getOrder(userId: number, id: number) {
-    const order = await this.prisma.order.findFirst({
-      where: { id, userId },
-      select: {
-        id: true,
-        orderNumber: true,
-        subtotal: true,
-        shippingFee: true,
-        discount: true,
-        totalAmount: true,
-        status: true,
-        note: true,
-        createdAt: true,
-        updatedAt: true,
-        address: { select: { fullName: true, phone: true, province: true, district: true, ward: true, streetAddress: true } },
-        payment: { select: { method: true, status: true, amount: true, paidAt: true } },
-        shipping: { select: { carrier: true, trackingNumber: true, status: true, estimatedDate: true, deliveredAt: true } },
-        items: { select: { id: true, productName: true, variantName: true, price: true, quantity: true } },
-      },
-    });
-    if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
-    return order;
   }
 
   async claimServiceRequest(userId: number, dto: ClaimServiceRequestDto) {

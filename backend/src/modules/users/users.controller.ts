@@ -113,19 +113,6 @@ export class UsersController {
     };
   }
 
-  @Get('orders')
-  async orders(@CurrentUser() user: AccountUser): Promise<AccountApiResponse> {
-    return { success: true, data: await this.usersService.listOrders(user.userId) };
-  }
-
-  @Get('orders/:id')
-  async order(
-    @CurrentUser() user: AccountUser,
-    @Param('id', ParseIntPipe) id: number,
-  ): Promise<AccountApiResponse> {
-    return { success: true, data: await this.usersService.getOrder(user.userId, id) };
-  }
-
   @Get('service-requests')
   async serviceRequests(@CurrentUser() user: AccountUser): Promise<AccountApiResponse> {
     return { success: true, data: await this.usersService.listServiceRequests(user.userId) };

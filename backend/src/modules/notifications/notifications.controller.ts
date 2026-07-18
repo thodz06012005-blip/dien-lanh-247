@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { ADMIN_PERMISSIONS } from '../../common/auth/admin-permissions';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -15,13 +23,19 @@ export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
 
   @Get()
-  @Permissions(ADMIN_PERMISSIONS.OPERATIONS_VIEW)
-  list(@Query('limit') limit?: string, @Query('unreadOnly') unreadOnly?: string) {
-    return this.notifications.listAdminNotifications(Number(limit || 30), unreadOnly === 'true');
+  @Permissions(ADMIN_PERMISSIONS.NOTIFICATIONS_VIEW)
+  list(
+    @Query('limit') limit?: string,
+    @Query('unreadOnly') unreadOnly?: string,
+  ) {
+    return this.notifications.listAdminNotifications(
+      Number(limit || 30),
+      unreadOnly === 'true',
+    );
   }
 
   @Patch(':id/read')
-  @Permissions(ADMIN_PERMISSIONS.OPERATIONS_VIEW)
+  @Permissions(ADMIN_PERMISSIONS.NOTIFICATIONS_VIEW)
   markRead(@Param('id') id: string) {
     return this.notifications.markRead(id);
   }

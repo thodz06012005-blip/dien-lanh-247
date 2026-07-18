@@ -2,165 +2,87 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../core/database/prisma.service';
 import { CustomerQueryDto } from './dto/customer-query.dto';
 
+interface ServiceCustomerRow {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  serviceRequestCount: bigint | number;
+  completedServiceCount: bigint | number;
+  serviceRevenue: string | number;
+  lastServiceAt: Date | null;
+  createdAt: Date;
+}
+
 @Injectable()
 export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query?: CustomerQueryDto) {
-    // 1. Fetch all Orders with address and user
-    const orders = await this.prisma.order.findMany({
-      include: {
-        address: true,
-        user: true,
-      },
-    });
+    const rows = await this.prisma.$queryRawUnsafe<ServiceCustomerRow[]>(
+      `SELECT
+         COALESCE(CAST(r.customerUserId AS CHAR), CONCAT('phone:', r.customerPhone)) AS id,
+         COALESCE(MAX(NULLIF(CONCAT_WS(' ', u.firstName, u.lastName), '')), MAX(r.customerName), 'Khách hàng') AS name,
+         MAX(r.customerPhone) AS phone,
+         COALESCE(MAX(u.email), MAX(r.customerEmail), '') AS email,
+         COUNT(DISTINCT r.id) AS serviceRequestCount,
+         COUNT(DISTINCT CASE WHEN r.workflowStatus IN ('COMPLETED','CLOSED') THEN r.id END) AS completedServiceCount,
+         COALESCE(SUM(payment.paidAmount), 0) AS serviceRevenue,
+         MAX(r.createdAt) AS lastServiceAt,
+         MIN(r.createdAt) AS createdAt
+       FROM ServiceRequest r
+       LEFT JOIN User u ON u.id = r.customerUserId
+       LEFT JOIN (
+         SELECT requestId, SUM(amount) AS paidAmount
+         FROM ServicePaymentRecord
+         WHERE status = 'COMPLETED'
+         GROUP BY requestId
+       ) payment ON payment.requestId = r.id
+       GROUP BY COALESCE(CAST(r.customerUserId AS CHAR), CONCAT('phone:', r.customerPhone))`,
+    );
 
-    // 2. Fetch all Service Requests
-    const serviceRequests = await this.prisma.serviceRequest.findMany();
-
-    // 3. Fetch all Users with role CUSTOMER
-    const users = await this.prisma.user.findMany({
-      where: { role: 'CUSTOMER' },
-    });
-
-    // Map to aggregate customers by phone number
-    const customersMap = new Map<string, {
-      id: string;
-      name: string;
-      phone: string;
-      email: string;
-      orderCount: number;
-      totalSpent: number;
-      createdAt: Date;
-    }>();
-
-    // Helper to normalize phone numbers
-    const normalizePhone = (p: string) => p.replace(/\s+/g, '').trim();
-
-    // A. Process Users first
-    for (const u of users) {
-      const phone = u.phone ? normalizePhone(u.phone) : '';
-      if (!phone) continue;
-
-      customersMap.set(phone, {
-        id: phone,
-        name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Khách hàng',
-        phone: phone,
-        email: u.email || '',
-        orderCount: 0,
-        totalSpent: 0,
-        createdAt: u.createdAt,
-      });
-    }
-
-    // B. Process Orders to aggregate orderCount and totalSpent
-    for (const o of orders) {
-      const phone = o.address?.phone ? normalizePhone(o.address.phone) : '';
-      if (!phone) continue;
-
-      const existing = customersMap.get(phone);
-      if (existing) {
-        existing.orderCount += 1;
-        existing.totalSpent += Number(o.totalAmount);
-        if (o.address?.fullName && existing.name === 'Khách hàng') {
-          existing.name = o.address.fullName;
-        }
-        if (o.user?.email && !existing.email) {
-          existing.email = o.user.email;
-        }
-        if (o.createdAt < existing.createdAt) {
-          existing.createdAt = o.createdAt;
-        }
-      } else {
-        customersMap.set(phone, {
-          id: phone,
-          name: o.address?.fullName || 'Khách hàng',
-          phone: phone,
-          email: o.user?.email || '',
-          orderCount: 1,
-          totalSpent: Number(o.totalAmount),
-          createdAt: o.createdAt,
-        });
-      }
-    }
-
-    // C. Process Service Requests to capture customers who only booked services
-    for (const sr of serviceRequests) {
-      const phone = sr.customerPhone ? normalizePhone(sr.customerPhone) : '';
-      if (!phone) continue;
-
-      const existing = customersMap.get(phone);
-      if (existing) {
-        if (sr.customerName && existing.name === 'Khách hàng') {
-          existing.name = sr.customerName;
-        }
-        if (sr.createdAt < existing.createdAt) {
-          existing.createdAt = sr.createdAt;
-        }
-      } else {
-        customersMap.set(phone, {
-          id: phone,
-          name: sr.customerName || 'Khách hàng',
-          phone: phone,
-          email: '',
-          orderCount: 0,
-          totalSpent: 0,
-          createdAt: sr.createdAt,
-        });
-      }
-    }
-
-    // Convert map to array
-    let customersList = Array.from(customersMap.values());
-
-    // 4. Apply Search Filter in memory
-    if (query?.q) {
-      const searchVal = query.q.toLowerCase().trim();
-      if (searchVal.length > 0) {
-        customersList = customersList.filter(c =>
-          c.name.toLowerCase().includes(searchVal) ||
-          c.phone.includes(searchVal) ||
-          c.email.toLowerCase().includes(searchVal)
-        );
-      }
-    }
-
-    // 5. Apply Sorting in memory
-    const sortOrder = (query?.sortOrder || 'desc').toLowerCase() === 'asc' ? 1 : -1;
-    const sortBy = query?.sortBy || 'createdAt';
-    const allowedSortFields = ['name', 'email', 'phone', 'orderCount', 'totalOrders', 'totalSpent', 'createdAt'];
-
-    if (allowedSortFields.includes(sortBy)) {
-      customersList.sort((a: any, b: any) => {
-        const fieldName = sortBy === 'totalOrders' ? 'orderCount' : sortBy;
-        let valA = a[fieldName];
-        let valB = b[fieldName];
-
-        if (valA instanceof Date) valA = valA.getTime();
-        if (valB instanceof Date) valB = valB.getTime();
-
-        if (typeof valA === 'string') {
-          return valA.localeCompare(valB) * sortOrder;
-        }
-        return (valA > valB ? 1 : valA < valB ? -1 : 0) * sortOrder;
-      });
-    }
-
-    // 6. Apply Pagination in memory
-    const page = Math.max(1, query?.page || 1);
-    const limit = Math.min(100, Math.max(1, query?.limit || 10));
-    const startIndex = (page - 1) * limit;
-    const paginatedList = customersList.slice(startIndex, startIndex + limit);
-
-    // Map response model format
-    const result = paginatedList.map(c => ({
-      ...c,
-      createdAt: c.createdAt.toISOString(),
+    let customers = rows.map((row) => ({
+      ...row,
+      serviceRequestCount: Number(row.serviceRequestCount),
+      completedServiceCount: Number(row.completedServiceCount),
+      serviceRevenue: Number(row.serviceRevenue),
+      lastServiceAt: row.lastServiceAt?.toISOString() ?? null,
+      createdAt: row.createdAt.toISOString(),
     }));
 
+    const term = query?.q?.trim().toLocaleLowerCase('vi-VN');
+    if (term) {
+      customers = customers.filter(
+        (customer) =>
+          customer.name.toLocaleLowerCase('vi-VN').includes(term) ||
+          customer.phone.includes(term) ||
+          customer.email.toLocaleLowerCase('vi-VN').includes(term),
+      );
+    }
+
+    const sortBy = query?.sortBy ?? 'lastServiceAt';
+    const direction = query?.sortOrder?.toLowerCase() === 'asc' ? 1 : -1;
+    customers.sort((left, right) => {
+      const a = left[sortBy as keyof typeof left] ?? '';
+      const b = right[sortBy as keyof typeof right] ?? '';
+      return (
+        (typeof a === 'number' && typeof b === 'number'
+          ? a - b
+          : String(a).localeCompare(String(b))) * direction
+      );
+    });
+
+    const page = Math.max(1, query?.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query?.limit ?? 100));
     return {
       success: true,
-      data: result,
+      data: customers.slice((page - 1) * limit, page * limit),
+      meta: {
+        page,
+        limit,
+        total: customers.length,
+        totalPages: Math.max(1, Math.ceil(customers.length / limit)),
+      },
     };
   }
 }

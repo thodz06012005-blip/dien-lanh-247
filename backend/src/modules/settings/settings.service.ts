@@ -20,8 +20,6 @@ export class SettingsService {
           zalo: '0987654321',
           email: 'support@dienlanh247.vn',
           address: '123 Đường Cầu Giấy, Hà Nội',
-          shippingFee: 30000,
-          freeShippingThreshold: 10000000,
         },
       });
     }
@@ -38,8 +36,6 @@ export class SettingsService {
         zalo: settings.zalo,
         email: settings.email,
         address: settings.address,
-        shippingFee: Number(settings.shippingFee),
-        freeShippingThreshold: Number(settings.freeShippingThreshold),
       },
     };
   }
@@ -49,9 +45,12 @@ export class SettingsService {
     return {
       success: true,
       data: {
-        ...settings,
-        shippingFee: Number(settings.shippingFee),
-        freeShippingThreshold: Number(settings.freeShippingThreshold),
+        id: settings.id,
+        storeName: settings.storeName,
+        hotline: settings.hotline,
+        zalo: settings.zalo,
+        email: settings.email,
+        address: settings.address,
       },
     };
   }
@@ -67,8 +66,6 @@ export class SettingsService {
         zalo: dto.zalo,
         email: dto.email,
         address: dto.address,
-        shippingFee: dto.shippingFee,
-        freeShippingThreshold: dto.freeShippingThreshold,
       },
     });
 
@@ -76,9 +73,12 @@ export class SettingsService {
       success: true,
       message: 'Cập nhật cài đặt hệ thống thành công',
       data: {
-        ...updated,
-        shippingFee: Number(updated.shippingFee),
-        freeShippingThreshold: Number(updated.freeShippingThreshold),
+        id: updated.id,
+        storeName: updated.storeName,
+        hotline: updated.hotline,
+        zalo: updated.zalo,
+        email: updated.email,
+        address: updated.address,
       },
     };
   }

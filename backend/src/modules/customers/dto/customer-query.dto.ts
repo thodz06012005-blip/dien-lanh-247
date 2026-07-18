@@ -4,15 +4,27 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 export class CustomerQueryDto extends PaginationDto {
   @IsOptional()
   @IsString()
-  @IsEnum(['name', 'email', 'phone', 'orderCount', 'totalSpent', 'createdAt'], {
-    message: 'Trường sắp xếp không hợp lệ'
-  })
+  @IsEnum(
+    [
+      'name',
+      'email',
+      'phone',
+      'serviceRequestCount',
+      'completedServiceCount',
+      'serviceRevenue',
+      'lastServiceAt',
+      'createdAt',
+    ],
+    {
+      message: 'Trường sắp xếp không hợp lệ',
+    },
+  )
   sortBy?: string;
 
   @IsOptional()
   @IsString()
   @IsEnum(['asc', 'desc', 'ASC', 'DESC'], {
-    message: 'Thứ tự sắp xếp chỉ nhận asc hoặc desc'
+    message: 'Thứ tự sắp xếp chỉ nhận asc hoặc desc',
   })
   sortOrder?: string;
 

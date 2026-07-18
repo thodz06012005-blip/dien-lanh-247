@@ -21,7 +21,8 @@ const requiredFiles = [
 ];
 
 test('Phase 8 foundation files exist', () => {
-  for (const path of requiredFiles) assert.equal(existsSync(resolve(root, path)), true, `missing ${path}`);
+  for (const path of requiredFiles)
+    assert.equal(existsSync(resolve(root, path)), true, `missing ${path}`);
 });
 
 test('admin session is cookie-backed and isolated from customer session', () => {
@@ -52,21 +53,35 @@ test('permission catalog controls backend and direct frontend routes', () => {
   assert.match(settings, /SETTINGS_MANAGE/);
 });
 
-test('dashboard consumes a single real backend snapshot', () => {
+test('dashboard consumes the service operations snapshot', () => {
   const page = read('frontend-admin/src/pages/Dashboard.tsx');
   const service = read('backend/src/modules/dashboard/dashboard.service.ts');
-  assert.match(page, /api\.get\('\/admin\/dashboard'\)/);
-  assert.doesNotMatch(page, /api\.get\('\/admin\/orders'\)/);
-  assert.doesNotMatch(page, /api\.get\('\/admin\/products'\)/);
-  for (const contract of ['revenue7d', 'orderStatus', 'serviceStatus', 'attention', 'recentOrders']) assert.match(service, new RegExp(contract));
-  assert.match(service, /FROM ServiceRequest/);
-  assert.match(service, /prisma\.order/);
-  assert.match(service, /prisma\.variant/);
+  assert.match(page, /getOperationsOverview/);
+  assert.match(page, /getSlaAlerts/);
+  for (const contract of [
+    'activeRequests',
+    'breachedSla',
+    'unpaidAcceptedQuotes',
+    'serviceRevenue30Days',
+    'activeWarranties',
+  ])
+    assert.match(page, new RegExp(contract));
+  assert.match(service, /OperationsService/);
+  assert.doesNotMatch(service, /prisma\.(order|product|variant)/);
 });
 
 test('standard data table supports all required administration operations', () => {
   const table = read('frontend-admin/src/components/admin/AdminDataTable.tsx');
-  for (const capability of ['searchFields', 'filters', 'toggleSort', 'togglePage', 'selectedRows', 'exportCsv', 'pageSize']) assert.match(table, new RegExp(capability));
+  for (const capability of [
+    'searchFields',
+    'filters',
+    'toggleSort',
+    'togglePage',
+    'selectedRows',
+    'exportCsv',
+    'pageSize',
+  ])
+    assert.match(table, new RegExp(capability));
   assert.match(table, /text\/csv/);
 });
 

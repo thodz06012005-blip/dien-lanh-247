@@ -1,10 +1,9 @@
 import {
+  Bell,
+  ClipboardList,
   FileText,
   LayoutDashboard,
-  Package,
-  Palette,
   Settings,
-  ShoppingBag,
   UserRound,
   Users,
   Workflow,
@@ -12,7 +11,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { ADMIN_PERMISSIONS } from './adminPermissions';
-import { env } from './env';
 import type { AdminPermission } from '@/types/admin';
 
 export interface AdminNavigationItem {
@@ -23,7 +21,6 @@ export interface AdminNavigationItem {
   permission: AdminPermission;
   exact?: boolean;
   keywords?: string[];
-  commerceOnly?: boolean;
 }
 
 export interface AdminNavigationGroup {
@@ -31,40 +28,32 @@ export interface AdminNavigationGroup {
   items: AdminNavigationItem[];
 }
 
-const completeAdminNavigation: AdminNavigationGroup[] = [
+export const adminNavigation: AdminNavigationGroup[] = [
   {
-    title: 'Điều hành',
+    title: 'Điều hành dịch vụ',
     items: [
-      { path: '/', label: 'Tổng quan hệ thống', shortLabel: 'Tổng quan', icon: LayoutDashboard, permission: ADMIN_PERMISSIONS.DASHBOARD_VIEW, exact: true, keywords: ['dashboard', 'kpi'] },
+      { path: '/', label: 'Tổng quan dịch vụ', shortLabel: 'Tổng quan', icon: LayoutDashboard, permission: ADMIN_PERMISSIONS.DASHBOARD_VIEW, exact: true, keywords: ['dashboard', 'kpi', 'sla', 'doanh thu dịch vụ'] },
       { path: '/operations', label: 'Trung tâm điều phối', shortLabel: 'Điều phối', icon: Workflow, permission: ADMIN_PERMISSIONS.OPERATIONS_VIEW, keywords: ['sla', 'báo giá', 'bảo hành', 'kỹ thuật viên', 'thiết bị'] },
-      { path: '/orders', label: 'Quản lý đơn hàng', shortLabel: 'Đơn hàng', icon: ShoppingBag, permission: ADMIN_PERMISSIONS.ORDERS_VIEW, keywords: ['giao hàng', 'thanh toán'], commerceOnly: true },
-      { path: '/service-requests', label: 'Yêu cầu sửa chữa', shortLabel: 'Dịch vụ', icon: Wrench, permission: ADMIN_PERMISSIONS.SERVICES_VIEW, keywords: ['yêu cầu', 'trạng thái'] },
+      { path: '/service-requests', label: 'Yêu cầu sửa chữa', shortLabel: 'Dịch vụ', icon: Wrench, permission: ADMIN_PERMISSIONS.SERVICES_VIEW, keywords: ['yêu cầu', 'trạng thái', 'lịch hẹn'] },
+      { path: '/notifications', label: 'Trung tâm thông báo', shortLabel: 'Thông báo', icon: Bell, permission: ADMIN_PERMISSIONS.NOTIFICATIONS_VIEW, keywords: ['cảnh báo', 'sla', 'email'] },
     ],
   },
   {
-    title: 'Danh mục',
+    title: 'Khách hàng & nội dung',
     items: [
-      { path: '/products', label: 'Quản lý sản phẩm', shortLabel: 'Sản phẩm', icon: Package, permission: ADMIN_PERMISSIONS.PRODUCTS_VIEW, keywords: ['tồn kho', 'sku'], commerceOnly: true },
-      { path: '/customers', label: 'Quản lý khách hàng', shortLabel: 'Khách hàng', icon: Users, permission: ADMIN_PERMISSIONS.CUSTOMERS_VIEW, keywords: ['crm', 'tài khoản'] },
-      { path: '/technicians', label: 'Quản lý kỹ thuật viên', shortLabel: 'Kỹ thuật viên', icon: UserRound, permission: ADMIN_PERMISSIONS.TECHNICIANS_VIEW, keywords: ['thợ', 'phân công'] },
-      { path: '/content', label: 'Nội dung website', shortLabel: 'Nội dung', icon: FileText, permission: ADMIN_PERMISSIONS.CONTENT_VIEW, keywords: ['bài viết', 'dự án'] },
+      { path: '/customers', label: 'Hồ sơ khách hàng', shortLabel: 'Khách hàng', icon: Users, permission: ADMIN_PERMISSIONS.CUSTOMERS_VIEW, keywords: ['crm', 'thiết bị', 'lịch sử dịch vụ'] },
+      { path: '/technicians', label: 'Quản lý kỹ thuật viên', shortLabel: 'Kỹ thuật viên', icon: UserRound, permission: ADMIN_PERMISSIONS.TECHNICIANS_VIEW, keywords: ['thợ', 'phân công', 'lịch làm việc'] },
+      { path: '/content', label: 'Content Hub', shortLabel: 'Nội dung', icon: FileText, permission: ADMIN_PERMISSIONS.CONTENT_VIEW, keywords: ['bài viết', 'dự án', 'dịch vụ'] },
     ],
   },
   {
     title: 'Hệ thống',
     items: [
-      { path: '/settings', label: 'Cài đặt hệ thống', shortLabel: 'Cài đặt', icon: Settings, permission: ADMIN_PERMISSIONS.SETTINGS_VIEW, keywords: ['cấu hình'] },
-      { path: '/design-system', label: 'Thư viện giao diện', shortLabel: 'Design system', icon: Palette, permission: ADMIN_PERMISSIONS.DESIGN_SYSTEM_VIEW, keywords: ['component', 'ui'] },
+      { path: '/settings', label: 'Cài đặt hệ thống', shortLabel: 'Cài đặt', icon: Settings, permission: ADMIN_PERMISSIONS.SETTINGS_VIEW, keywords: ['cấu hình', 'hotline', 'zalo'] },
+      { path: '/audit', label: 'Nhật ký kiểm toán', shortLabel: 'Audit', icon: ClipboardList, permission: ADMIN_PERMISSIONS.AUDIT_VIEW, keywords: ['bảo mật', 'nhật ký', 'truy vết'] },
     ],
   },
 ];
-
-export const adminNavigation: AdminNavigationGroup[] = completeAdminNavigation
-  .map((group) => ({
-    ...group,
-    items: group.items.filter((item) => !env.serviceOnlyMode || !item.commerceOnly),
-  }))
-  .filter((group) => group.items.length > 0);
 
 export const flatAdminNavigation = adminNavigation.flatMap((group) => group.items);
 

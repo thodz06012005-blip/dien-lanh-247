@@ -5,11 +5,7 @@ const { respondSuccess } = require('../utils/response');
 const { requirePermission } = require('../utils/auth');
 const { isValidEmail } = require('../utils/validators');
 const { auditSuccess } = require('../utils/auditLog');
-const {
-  validateOptionalString,
-  validateNumber,
-  sendValidationError
-} = require('../utils/validation');
+const { validateOptionalString, sendValidationError } = require('../utils/validation');
 
 // GET /admin/settings — requires: settings:read (superadmin, admin)
 router.get('/admin/settings', requirePermission('settings:read'), (req, res) => {
@@ -28,15 +24,7 @@ router.patch('/admin/settings', requirePermission('settings:update'), (req, res)
   const body = req.body;
   const errors = [];
 
-  const allowedKeys = [
-    'storeName',
-    'hotline',
-    'zalo',
-    'email',
-    'address',
-    'shippingFee',
-    'freeShippingThreshold'
-  ];
+  const allowedKeys = ['storeName', 'hotline', 'zalo', 'email', 'address'];
 
   // Forbid non-whitelisted keys
   const bodyKeys = Object.keys(body);
@@ -50,15 +38,11 @@ router.patch('/admin/settings', requirePermission('settings:update'), (req, res)
     return sendValidationError(res, errors);
   }
 
-  if (body.storeName !== undefined) validateOptionalString(body.storeName, 'storeName', errors, 100);
+  if (body.storeName !== undefined)
+    validateOptionalString(body.storeName, 'storeName', errors, 100);
   if (body.hotline !== undefined) validateOptionalString(body.hotline, 'hotline', errors, 20);
   if (body.zalo !== undefined) validateOptionalString(body.zalo, 'zalo', errors, 20);
   if (body.address !== undefined) validateOptionalString(body.address, 'address', errors, 200);
-  if (body.shippingFee !== undefined) validateNumber(body.shippingFee, 'shippingFee', errors, 0, 1000000);
-  if (body.freeShippingThreshold !== undefined) {
-    validateNumber(body.freeShippingThreshold, 'freeShippingThreshold', errors, 0, 100000000);
-  }
-
   if (body.email !== undefined && body.email !== '') {
     validateOptionalString(body.email, 'email', errors, 100);
     if (!isValidEmail(body.email.trim())) {
@@ -73,10 +57,17 @@ router.patch('/admin/settings', requirePermission('settings:update'), (req, res)
   const db = readDB();
   db.settings = {
     ...db.settings,
-    ...body
+    ...body,
   };
   writeDB(db);
-  auditSuccess(req, 'SETTINGS_UPDATED', 'settings', 'default', body, 'System settings updated successfully');
+  auditSuccess(
+    req,
+    'SETTINGS_UPDATED',
+    'settings',
+    'default',
+    body,
+    'System settings updated successfully',
+  );
   return respondSuccess(res, db.settings, 'Cập nhật cài đặt hệ thống thành công');
 });
 

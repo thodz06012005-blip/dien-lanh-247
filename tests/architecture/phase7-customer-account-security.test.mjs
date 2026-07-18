@@ -7,15 +7,28 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const read = (path) => readFileSync(resolve(root, path), 'utf8');
 
-const migrationPath = 'backend/prisma/migrations/20260714100000_phase7_customer_account_security/migration.sql';
+const migrationPath =
+  'backend/prisma/migrations/20260714100000_phase7_customer_account_security/migration.sql';
 
 test('Phase 7 migration is additive and introduces customer security records', () => {
   assert.equal(existsSync(resolve(root, migrationPath)), true);
   const migration = read(migrationPath);
-  for (const table of ['AuthSession', 'PasswordResetToken', 'EmailVerificationToken', 'CustomerNotification', 'ServiceRequestReview']) {
+  for (const table of [
+    'AuthSession',
+    'PasswordResetToken',
+    'EmailVerificationToken',
+    'CustomerNotification',
+    'ServiceRequestReview',
+  ]) {
     assert.equal(migration.includes(`CREATE TABLE \`${table}\``), true, `missing table ${table}`);
   }
-  for (const column of ['normalizedPhone', 'emailVerifiedAt', 'phoneVerifiedAt', 'tokenVersion', 'customerUserId']) {
+  for (const column of [
+    'normalizedPhone',
+    'emailVerifiedAt',
+    'phoneVerifiedAt',
+    'tokenVersion',
+    'customerUserId',
+  ]) {
     assert.equal(migration.includes(`ADD COLUMN \`${column}\``), true, `missing column ${column}`);
   }
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|RENAME TABLE/i);
@@ -34,11 +47,27 @@ test('refresh tokens are rotated per session and raw tokens are not persisted', 
 test('customer login, recovery and account endpoints are complete', () => {
   const auth = read('backend/src/modules/auth/auth.controller.ts');
   const account = read('backend/src/modules/users/users.controller.ts');
-  for (const route of ['register', 'login', 'refresh', 'logout', 'logout-all', 'forgot-password', 'reset-password', 'verify-email']) {
+  for (const route of [
+    'register',
+    'login',
+    'refresh',
+    'logout',
+    'logout-all',
+    'forgot-password',
+    'reset-password',
+    'verify-email',
+  ]) {
     assert.equal(auth.includes(`'${route}'`), true, `missing auth route ${route}`);
   }
   assert.match(account, /@Controller\('account'\)[\s\S]*@UseGuards\(JwtAuthGuard\)/);
-  for (const route of ['profile', 'addresses', 'change-password', 'orders', 'service-requests', 'notifications', 'sessions']) {
+  for (const route of [
+    'profile',
+    'addresses',
+    'change-password',
+    'service-requests',
+    'notifications',
+    'sessions',
+  ]) {
     assert.equal(account.includes(`'${route}`), true, `missing account route ${route}`);
   }
 });
@@ -46,10 +75,8 @@ test('customer login, recovery and account endpoints are complete', () => {
 test('account ownership is determined by JWT userId, not URL phone data', () => {
   const usersService = read('backend/src/modules/users/users.service.ts');
   assert.match(usersService, /WHERE sr\.id = \? AND sr\.customerUserId = \?/);
-  assert.match(usersService, /where:\s*\{\s*id,\s*userId\s*\}/);
   assert.match(usersService, /WHERE id = \? AND userId = \?/);
-  assert.doesNotMatch(usersService, /getOrder\([^)]*phone/);
-  assert.doesNotMatch(usersService, /listOrders\([^)]*phone/);
+  assert.doesNotMatch(usersService, /prisma\.order|getOrder|listOrders/);
 });
 
 test('frontend session is cookie-backed and protected routes are guarded', () => {

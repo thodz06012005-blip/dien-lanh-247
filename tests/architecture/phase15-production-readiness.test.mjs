@@ -16,9 +16,10 @@ test('Phase 15 provides service unit tests and critical API integration coverage
     'locks the email and IP combination',
     'clears matching failures',
   ]);
-  containsAll(read('backend/src/modules/products/products.service.spec.ts'), [
-    'soft deletes products',
-    'isActive: false',
+  containsAll(read('backend/src/modules/operations/quote-calculator.spec.ts'), [
+    'preserves labor and material lines',
+    'laborSubtotal',
+    'materialSubtotal',
   ]);
   containsAll(read('backend/src/modules/health/health.service.spec.ts'), [
     'reports readiness',

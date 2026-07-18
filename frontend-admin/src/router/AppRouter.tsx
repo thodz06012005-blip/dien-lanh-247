@@ -1,20 +1,17 @@
 import type { ReactNode } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ADMIN_PERMISSIONS } from '@/config/adminPermissions';
-import { env } from '@/config/env';
 import AdminLayout from '@/layouts/AdminLayout';
 import AdminProfile from '@/pages/AdminProfile';
+import Audit from '@/pages/Audit';
 import Customers from '@/pages/Customers';
 import Dashboard from '@/pages/Dashboard';
-import DesignSystem from '@/pages/DesignSystem';
 import EditorialCms from '@/pages/EditorialCms';
 import Forbidden from '@/pages/Forbidden';
 import Login from '@/pages/Login';
 import NotFound from '@/pages/NotFound';
 import Notifications from '@/pages/Notifications';
 import Operations from '@/pages/Operations';
-import Orders from '@/pages/Orders';
-import Products from '@/pages/Products';
 import ServiceRequestDetail from '@/pages/ServiceRequestDetail';
 import ServiceRequests from '@/pages/ServiceRequests';
 import Settings from '@/pages/Settings';
@@ -38,25 +35,16 @@ export default function AppRouter() {
           <Route path="/" element={<AdminLayout />}>
             <Route index element={<ProtectedPage permission={ADMIN_PERMISSIONS.DASHBOARD_VIEW}><Dashboard /></ProtectedPage>} />
             <Route path="operations" element={<ProtectedPage permission={ADMIN_PERMISSIONS.OPERATIONS_VIEW}><Operations /></ProtectedPage>} />
-            <Route path="notifications" element={<ProtectedPage permission={ADMIN_PERMISSIONS.OPERATIONS_VIEW}><Notifications /></ProtectedPage>} />
+            <Route path="notifications" element={<ProtectedPage permission={ADMIN_PERMISSIONS.NOTIFICATIONS_VIEW}><Notifications /></ProtectedPage>} />
             <Route path="content" element={<ProtectedPage permission={ADMIN_PERMISSIONS.CONTENT_VIEW}><EditorialCms /></ProtectedPage>} />
-            {env.serviceOnlyMode ? (
-              <>
-                <Route path="products/*" element={<Navigate to="/operations" replace />} />
-                <Route path="orders/*" element={<Navigate to="/operations" replace />} />
-              </>
-            ) : (
-              <>
-                <Route path="products" element={<ProtectedPage permission={ADMIN_PERMISSIONS.PRODUCTS_VIEW}><Products /></ProtectedPage>} />
-                <Route path="orders" element={<ProtectedPage permission={ADMIN_PERMISSIONS.ORDERS_VIEW}><Orders /></ProtectedPage>} />
-              </>
-            )}
+            <Route path="products/*" element={<Navigate to="/operations" replace />} />
+            <Route path="orders/*" element={<Navigate to="/operations" replace />} />
             <Route path="customers" element={<ProtectedPage permission={ADMIN_PERMISSIONS.CUSTOMERS_VIEW}><Customers /></ProtectedPage>} />
             <Route path="settings" element={<ProtectedPage permission={ADMIN_PERMISSIONS.SETTINGS_VIEW}><Settings /></ProtectedPage>} />
             <Route path="service-requests" element={<ProtectedPage permission={ADMIN_PERMISSIONS.SERVICES_VIEW}><ServiceRequests /></ProtectedPage>} />
             <Route path="service-requests/:id" element={<ProtectedPage permission={ADMIN_PERMISSIONS.SERVICES_VIEW}><ServiceRequestDetail /></ProtectedPage>} />
             <Route path="technicians" element={<ProtectedPage permission={ADMIN_PERMISSIONS.TECHNICIANS_VIEW}><Technicians /></ProtectedPage>} />
-            <Route path="design-system" element={<ProtectedPage permission={ADMIN_PERMISSIONS.DESIGN_SYSTEM_VIEW}><DesignSystem /></ProtectedPage>} />
+            <Route path="audit" element={<ProtectedPage permission={ADMIN_PERMISSIONS.AUDIT_VIEW}><Audit /></ProtectedPage>} />
             <Route path="profile" element={<ProtectedPage permission={ADMIN_PERMISSIONS.PROFILE_VIEW}><AdminProfile /></ProtectedPage>} />
           </Route>
         </Route>

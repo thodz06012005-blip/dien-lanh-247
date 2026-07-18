@@ -152,14 +152,8 @@
       "phone": "0981112222",
       "email": "hung.nv@dienlanh247.vn",
       "rating": 4.8,
-      "skills": [
-        "sua-dieu-hoa",
-        "ve-sinh-dieu-hoa"
-      ],
-      "workingAreas": [
-        "Quận Cầu Giấy",
-        "Quận Nam Từ Liêm"
-      ],
+      "skills": ["sua-dieu-hoa", "ve-sinh-dieu-hoa"],
+      "workingAreas": ["Quận Cầu Giấy", "Quận Nam Từ Liêm"],
       "status": "available",
       "completedCount": 24,
       "createdAt": "2026-06-29T09:54:32.205Z"
@@ -170,14 +164,8 @@
       "phone": "0982223333",
       "email": "hai.tm@dienlanh247.vn",
       "rating": 4.7,
-      "skills": [
-        "sua-tu-lanh",
-        "sua-may-giat"
-      ],
-      "workingAreas": [
-        "Quận Đống Đa",
-        "Quận Thanh Xuân"
-      ],
+      "skills": ["sua-tu-lanh", "sua-may-giat"],
+      "workingAreas": ["Quận Đống Đa", "Quận Thanh Xuân"],
       "status": "available",
       "completedCount": 18,
       "createdAt": "2026-06-29T09:54:32.205Z"
@@ -188,14 +176,8 @@
       "phone": "0983334444",
       "email": "nam.lh@dienlanh247.vn",
       "rating": 4.9,
-      "skills": [
-        "sua-dieu-hoa",
-        "lap-dat-dieu-hoa"
-      ],
-      "workingAreas": [
-        "Quận Ba Đình",
-        "Quận Tây Hồ"
-      ],
+      "skills": ["sua-dieu-hoa", "lap-dat-dieu-hoa"],
+      "workingAreas": ["Quận Ba Đình", "Quận Tây Hồ"],
       "status": "available",
       "completedCount": 35,
       "createdAt": "2026-06-29T09:54:32.205Z"
