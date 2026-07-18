@@ -70,7 +70,7 @@ Không được đánh dấu hoàn tất nếu bỏ qua bất kỳ cổng nào. 
 
 ### Backup và restore
 
-- [x] Tạo `.sql.gz` thành công.
+- [x] Tạo `.sql.gz.enc` bằng AES-256-GCM thành công.
 - [x] Tạo/kiểm tra SHA-256 thành công.
 - [x] Restore vào database tạm thành công.
 - [x] Chạy migration sau restore thành công.

@@ -1,0 +1,100 @@
+name: Phase 9-10 security SEO and observability
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend-user/**'
+      - 'frontend-admin/**'
+      - 'scripts/**'
+      - 'tests/architecture/phase9_10_*'
+      - 'docs/phase-9/**'
+      - 'docs/phase-10/**'
+      - '.github/workflows/phase9-10-security-seo-observability.yml'
+      - 'package.json'
+      - 'docker-compose.production.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase9-10-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Security, RBAC, SEO, builds and budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATASET_CLASSIFICATION: synthetic
+      DATABASE_URL: mysql://root:password@127.0.0.1:3306/dien_lanh_247
+      JWT_ACCESS_SECRET: test_only_phase9_access_secret_at_least_32_characters
+      JWT_REFRESH_SECRET: test_only_phase9_refresh_secret_at_least_32_characters
+      AUDIT_LOG_HASH_SALT: test_only_phase9_audit_salt_at_least_32_characters
+      CORS_ORIGINS: http://localhost:5173,http://localhost:5174
+      COOKIE_SECURE: 'false'
+      COOKIE_SAME_SITE: lax
+      ENABLE_DEV_ENDPOINTS: 'false'
+      ENABLE_DEMO_ACCOUNTS: 'false'
+      VITE_APP_ENV: test
+      VITE_SITE_URL: https://dienlanh247.vn
+      VITE_APP_URL: https://dienlanh247.vn
+      VITE_API_BASE_URL: http://127.0.0.1:3001/api/v1
+      VITE_API_TIMEOUT_MS: '15000'
+      VITE_USE_MOCK_API: 'true'
+      VITE_SERVICE_ONLY_MODE: 'true'
+      VITE_ENABLE_QUERY_DEVTOOLS: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend-user/package-lock.json
+            frontend-admin/package-lock.json
+      - name: Install applications
+        run: |
+          npm --prefix backend ci
+          npm --prefix frontend-user ci
+          npm --prefix frontend-admin ci
+          npm --prefix backend run prisma:generate
+      - name: Security and service-only metadata scans
+        run: |
+          npm run security:scan
+          npm run seo:scan-commerce-metadata
+          node --check scripts/backup-mysql.mjs
+          node --check scripts/restore-mysql.mjs
+      - name: Phase 9-10 contracts and RBAC negative tests
+        run: |
+          node --test tests/architecture/phase9_10_security_seo_observability.test.mjs
+          npm --prefix backend run test -- --runInBand src/common/auth/admin-permissions.spec.ts src/common/security/redaction.util.spec.ts
+      - name: Lint and typecheck
+        run: |
+          npm --prefix frontend-user run lint
+          npm --prefix frontend-admin run lint
+          npm --prefix backend run lint
+          npm --prefix frontend-user run typecheck
+          npm --prefix frontend-admin run typecheck
+          npm --prefix backend run typecheck
+      - name: Production builds and customer budgets
+        run: |
+          npm --prefix frontend-user run build
+          npm --prefix frontend-admin run build
+          npm --prefix backend run build
+          node scripts/verify-customer-build-budget.mjs frontend-user/dist
+      - name: Upload Phase 9-10 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase9-10-security-seo-observability
+          path: |
+            docs/phase-9/
+            docs/phase-10/
+            frontend-user/public/sitemap.xml
+            frontend-user/public/robots.txt
+          retention-days: 30

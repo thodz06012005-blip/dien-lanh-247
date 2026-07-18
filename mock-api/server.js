@@ -22,6 +22,8 @@ const {
   requireAdminAuth,
   isDemoAccountsEnabled,
   getUiPermissions,
+  issueAdminStepUp,
+  revokeAdminStepUps,
 } = require('./utils/auth');
 const technicianRouter = require('./routes/technicians');
 const adminDashboardRouter = require('./routes/adminDashboard');
@@ -68,7 +70,14 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'X-Requested-With', 'Cookie'],
+    allowedHeaders: [
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'X-Requested-With',
+      'X-CSRF-Protection',
+      'Cookie',
+    ],
   }),
 );
 const JSON_LIMIT = process.env.MOCK_JSON_BODY_LIMIT || '1mb';
@@ -111,6 +120,13 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: JSON_LIMIT }));
 app.use(express.urlencoded({ extended: false, limit: URLENCODED_LIMIT }));
+app.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const origin = req.headers.origin;
+  if (!origin) return next();
+  if (allowedOrigins.includes(origin) && req.headers['x-csrf-protection'] === '1') return next();
+  return respondError(res, 403, 'CSRF validation failed', 'CSRF_VALIDATION_FAILED');
+});
 app.use('/api/v1', serviceOnlyMiddleware(serviceOnlyMode));
 app.use('/api/v1', publicRoutes);
 app.use('/api/v1', serviceRequestRouter);
@@ -344,6 +360,7 @@ app.post('/api/v1/admin/auth/change-password', requireAdminAuth, (req, res) => {
   for (let index = adminSessions.length - 1; index >= 0; index -= 1) {
     if (adminSessions[index].adminId === admin.id) adminSessions.splice(index, 1);
   }
+  revokeAdminStepUps(admin.id);
   res.clearCookie('accessToken', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -364,6 +381,44 @@ app.post('/api/v1/admin/auth/change-password', requireAdminAuth, (req, res) => {
   );
 });
 
+// POST /admin/auth/step-up — five-minute, session-bound Super Admin verification
+app.post('/api/v1/admin/auth/step-up', requireAdminAuth, (req, res) => {
+  const admin = adminUsers.find((user) => user.id === req.admin.id);
+  if (
+    req.admin.role !== 'superadmin' ||
+    typeof req.body.currentPassword !== 'string' ||
+    req.body.currentPassword !== admin.password
+  ) {
+    auditFailure(
+      req,
+      'SUPERADMIN_STEP_UP_FAILED',
+      'auth',
+      req.admin.id,
+      null,
+      'Super Admin step-up verification failed',
+    );
+    return respondError(res, 403, 'Không thể xác minh Super Admin', 'STEP_UP_FAILED');
+  }
+  revokeAdminStepUps(admin.id, req.adminSession.token);
+  const token = issueAdminStepUp(admin.id, req.adminSession.token);
+  res.cookie('adminStepUpToken', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/v1/admin',
+    maxAge: 5 * 60 * 1000,
+  });
+  auditSuccess(
+    req,
+    'SUPERADMIN_STEP_UP_SUCCEEDED',
+    'auth',
+    admin.id,
+    null,
+    'Super Admin step-up verification succeeded',
+  );
+  return respondSuccess(res, { expiresInSeconds: 300 }, 'Đã xác minh Super Admin');
+});
+
 // DELETE /admin/auth/sessions/:id
 app.delete('/api/v1/admin/auth/sessions/:id', requireAdminAuth, (req, res) => {
   const index = adminSessions.findIndex(
@@ -373,6 +428,7 @@ app.delete('/api/v1/admin/auth/sessions/:id', requireAdminAuth, (req, res) => {
     return respondError(res, 404, 'Không tìm thấy phiên đăng nhập', 'SESSION_NOT_FOUND');
   }
   const [revokedSession] = adminSessions.splice(index, 1);
+  revokeAdminStepUps(req.admin.id, revokedSession.token);
   if (revokedSession.token === getRequestToken(req)) {
     res.clearCookie('accessToken', {
       httpOnly: true,
@@ -413,6 +469,7 @@ app.post('/api/v1/admin/auth/logout', (req, res) => {
       if (index !== -1) {
         adminSessions.splice(index, 1);
       }
+      revokeAdminStepUps(adminId, token);
     }
   }
 
@@ -422,6 +479,12 @@ app.post('/api/v1/admin/auth/logout', (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
+  });
+  res.clearCookie('adminStepUpToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/v1/admin',
   });
 
   return respondSuccess(res, null, 'Đăng xuất thành công');

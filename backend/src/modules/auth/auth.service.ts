@@ -27,7 +27,6 @@ interface SessionClaims {
   tokenVersion: number;
   refreshToken: string;
 }
-
 interface UserSecurityRow {
   id: number;
   email: string;
@@ -567,6 +566,36 @@ export class AuthService {
       refreshToken: tokens.refreshToken,
       expiresAt: Date.now() + this.durationToMs(this.getAccessExpiresIn(), 15 * 60_000),
     };
+  }
+
+  async issueAdminStepUp(
+    userId: number,
+    sessionId: string,
+    currentPassword: string,
+  ) {
+    const user = await this.getUserSecurityById(userId);
+    const matches = await bcrypt.compare(
+      currentPassword,
+      user?.password ?? this.dummyHash,
+    );
+    if (!user || !matches || user.role !== 'SUPERADMIN') {
+      throw new ForbiddenException('Không thể xác minh Super Admin');
+    }
+    this.assertAccountUsable(user);
+    return this.jwtService.signAsync(
+      {
+        sub: user.id,
+        sid: sessionId,
+        role: user.role,
+        purpose: 'admin-step-up',
+      },
+      {
+        secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
+        expiresIn: '5m',
+        audience: 'dien-lanh-247-admin',
+        issuer: 'dien-lanh-247-api',
+      },
+    );
   }
 
   async getAdminProfile(userId: number) {

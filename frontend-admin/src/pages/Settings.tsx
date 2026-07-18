@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Headphones, Save, Settings as SettingsIcon } from 'lucide-react';
+import { Headphones, LockKeyhole, Save, Settings as SettingsIcon } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import Input from '@/components/ui/Input';
 import LoadingState from '@/components/ui/LoadingState';
 import api from '@/services/api';
+import { ADMIN_PERMISSIONS } from '@/config/adminPermissions';
+import { useAdminAuthStore } from '@/store/adminAuthStore';
 
 interface ServiceSettings {
   storeName: string;
@@ -27,13 +29,19 @@ const emptySettings: ServiceSettings = {
 export default function Settings() {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<ServiceSettings>(emptySettings);
+  const [stepUpPassword, setStepUpPassword] = useState('');
+  const canManage = useAdminAuthStore((state) => state.hasPermission(ADMIN_PERMISSIONS.SETTINGS_MANAGE));
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-settings'],
     queryFn: async () => (await api.get('/admin/settings')).data,
   });
   const updateSettings = useMutation({
-    mutationFn: async (values: ServiceSettings) => api.patch('/admin/settings', values),
+    mutationFn: async (values: ServiceSettings) => {
+      await api.post('/admin/auth/step-up', { currentPassword: stepUpPassword });
+      return api.patch('/admin/settings', values);
+    },
     onSuccess: () => {
+      setStepUpPassword('');
       window.alert('Cập nhật cấu hình dịch vụ thành công');
       void queryClient.invalidateQueries({ queryKey: ['admin-settings'] });
     },
@@ -71,8 +79,9 @@ export default function Settings() {
           <Input label="Hotline dịch vụ (*)" name="hotline" value={formData.hotline} onChange={(event) => setFormData((current) => ({ ...current, hotline: event.target.value }))} required />
           <Input label="Zalo tư vấn (*)" name="zalo" value={formData.zalo} onChange={(event) => setFormData((current) => ({ ...current, zalo: event.target.value }))} required />
           <div className="sm:col-span-2"><Input label="Địa chỉ trung tâm dịch vụ" name="address" value={formData.address} onChange={(event) => setFormData((current) => ({ ...current, address: event.target.value }))} /></div>
+          {canManage ? <div className="sm:col-span-2 rounded-2xl border border-blue-100 bg-blue-50/70 p-5"><div className="mb-4 flex items-start gap-3"><div className="rounded-xl bg-blue-600 p-2 text-white"><LockKeyhole className="h-4 w-4" /></div><div><strong className="text-sm text-slate-950">Xác minh lại Super Admin</strong><p className="mt-1 text-xs leading-5 text-slate-600">Nhập mật khẩu hiện tại để mở cửa sổ step-up 5 phút trước khi lưu cấu hình nhạy cảm.</p></div></div><Input label="Mật khẩu Super Admin" name="stepUpPassword" type="password" autoComplete="current-password" value={stepUpPassword} onChange={(event) => setStepUpPassword(event.target.value)} required /></div> : <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Bạn có quyền xem cấu hình. Chỉ Super Admin đã xác minh lại mới được thay đổi.</div>}
         </div>
-        <div className="flex justify-end border-t border-slate-100 bg-slate-50/70 px-6 py-4 sm:px-8"><Button type="submit" isLoading={updateSettings.isPending} leftIcon={<Save className="h-4 w-4" />} className="rounded-xl px-6 font-bold">Lưu thay đổi</Button></div>
+        {canManage ? <div className="flex justify-end border-t border-slate-100 bg-slate-50/70 px-6 py-4 sm:px-8"><Button type="submit" isLoading={updateSettings.isPending} leftIcon={<Save className="h-4 w-4" />} className="rounded-xl px-6 font-bold">Xác minh và lưu</Button></div> : null}
       </form>
     </div>
   );

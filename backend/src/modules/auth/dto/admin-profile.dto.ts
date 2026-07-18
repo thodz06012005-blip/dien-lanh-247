@@ -1,4 +1,10 @@
-import { IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class UpdateAdminProfileDto {
   @IsString()
@@ -13,7 +19,9 @@ export class UpdateAdminProfileDto {
 
   @IsOptional()
   @IsString()
-  @Matches(/^(?:\+?84|0)(?:3|5|7|8|9)\d{8}$/, { message: 'Số điện thoại Việt Nam không hợp lệ' })
+  @Matches(/^(?:\+?84|0)(?:3|5|7|8|9)\d{8}$/, {
+    message: 'Số điện thoại Việt Nam không hợp lệ',
+  })
   phone?: string;
 }
 
@@ -29,4 +37,11 @@ export class ChangeAdminPasswordDto {
   @Matches(/[A-Z]/, { message: 'Mật khẩu phải có chữ hoa' })
   @Matches(/\d/, { message: 'Mật khẩu phải có chữ số' })
   newPassword: string;
+}
+
+export class AdminStepUpDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(128)
+  currentPassword: string;
 }

@@ -7,18 +7,21 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { AuditLogService } from '../audit/audit-log.service';
 import {
   AddressDto,
   ChangePasswordDto,
   ClaimServiceRequestDto,
   CustomerCancelServiceRequestDto,
   CustomerRescheduleServiceRequestDto,
+  PersonalDataRequestDto,
   ServiceRequestReviewDto,
   UpdateProfileDto,
 } from './dto/account.dto';
@@ -38,7 +41,10 @@ interface AccountApiResponse {
 @Controller('account')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   @Get()
   async overview(
@@ -242,6 +248,64 @@ export class UsersController {
     return {
       success: true,
       data: await this.usersService.listSessions(user.userId, user.sessionId),
+    };
+  }
+
+  @Get('privacy/export')
+  async privacyExport(
+    @CurrentUser() user: AccountUser,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AccountApiResponse> {
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    const data = await this.usersService.exportPersonalData(user.userId);
+    this.auditLogService.auditSuccess(
+      req,
+      'PERSONAL_DATA_EXPORTED',
+      'privacy',
+      String(user.userId),
+      null,
+      'Authenticated customer exported a personal data copy',
+    );
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @Get('privacy/requests')
+  async privacyRequests(
+    @CurrentUser() user: AccountUser,
+  ): Promise<AccountApiResponse> {
+    return {
+      success: true,
+      data: await this.usersService.listPersonalDataRequests(user.userId),
+    };
+  }
+
+  @Post('privacy/requests')
+  async createPrivacyRequest(
+    @CurrentUser() user: AccountUser,
+    @Body() dto: PersonalDataRequestDto,
+    @Req() req: Request,
+  ): Promise<AccountApiResponse> {
+    const data = await this.usersService.createPersonalDataRequest(
+      user.userId,
+      dto,
+    );
+    this.auditLogService.auditSuccess(
+      req,
+      'PERSONAL_DATA_REQUEST_CREATED',
+      'privacy',
+      data.id,
+      { requestType: data.requestType },
+      'Authenticated customer created a personal data request',
+    );
+    return {
+      success: true,
+      message: 'Yêu cầu quyền dữ liệu đã được tiếp nhận để xác minh và xử lý.',
+      data,
     };
   }
 

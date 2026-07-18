@@ -50,6 +50,7 @@ artifacts/
 mock-api/backups/
 backups/
 *.sql
+!backend/prisma/migrations/**/migration.sql
 *.sql.gz
 *.sha256
 *.bak

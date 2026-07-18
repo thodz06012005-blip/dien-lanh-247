@@ -30,7 +30,7 @@ Mỗi ca trực kiểm tra:
 - `/api/v1/health/ready` trả database `up`;
 - log không tăng đột biến 5xx/429;
 - dung lượng volume database, audit, media và backup;
-- backup mới nhất có file `.sql.gz` cùng `.sha256`;
+- backup mới nhất có file `.sql.gz.enc` cùng `.sha256`;
 - audit integrity trả `valid=true`.
 
 ## Health check và cảnh báo
@@ -72,6 +72,7 @@ Lịch đề xuất 02:15 hằng ngày:
 15 2 * * * cd /srv/dien-lanh-247 && \
 set -a && . deploy/env/production.env && set +a && \
 BACKUP_DIRECTORY=/srv/dl247-backups \
+BACKUP_ENCRYPTION_KEY="$BACKUP_ENCRYPTION_KEY" \
 npm run backup:mysql >> /var/log/dl247-backup.log 2>&1
 ```
 
@@ -91,7 +92,8 @@ Restore luôn thực hiện trên database staging/temporary trước. Ví dụ:
 export NODE_ENV=staging
 export DATABASE_URL='<target-staging-database-url-from-secret-manager>'
 export BACKUP_DIRECTORY=/srv/dl247-backups
-export RESTORE_FILE=/srv/dl247-backups/dien_lanh_247-<timestamp>.sql.gz
+export BACKUP_ENCRYPTION_KEY='<load-from-secret-manager>'
+export RESTORE_FILE=/srv/dl247-backups/dien_lanh_247-<timestamp>.sql.gz.enc
 export RESTORE_CONFIRM=dien_lanh_247_restore_test
 npm run restore:mysql
 ```
@@ -99,7 +101,7 @@ npm run restore:mysql
 Utility sẽ:
 
 1. xác minh file nằm trong `BACKUP_DIRECTORY`;
-2. yêu cầu `.sql.gz` và sidecar `.sha256`;
+2. yêu cầu `.sql.gz.enc` trong production và sidecar `.sha256`;
 3. đối chiếu checksum;
 4. yêu cầu `RESTORE_CONFIRM` đúng tên database đích;
 5. từ chối production nếu thiếu `ALLOW_PRODUCTION_RESTORE=true`;

@@ -18,10 +18,11 @@
   contain-intrinsic-size: auto 760px;
 }
 
-/* On narrow screens the gradient hero is visually complete without the remote photograph.
-   Hiding the picture prevents a late network image from replacing the text LCP candidate. */
+/* On narrow screens the gradient hero is visually complete without the photograph.
+   Hiding the keyed image prevents a late image from replacing the text LCP candidate,
+   whether OptimizedImage renders a local img or a remote picture element. */
 @media (max-width: 767px) {
-  #main-content > div.overflow-hidden.bg-white > section:first-child > picture:first-child {
+  #main-content > div.overflow-hidden.bg-white > section:first-child > [data-image-key='home.hero'] {
     display: none;
   }
 }

@@ -57,6 +57,16 @@ export interface AccountSession {
   current: boolean;
 }
 
+export interface PersonalDataRequest {
+  id: string;
+  requestType: 'ACCESS' | 'RECTIFY' | 'DELETE' | 'RESTRICT';
+  status: string;
+  reason?: string | null;
+  requestedAt: string;
+  dueAt: string;
+  completedAt?: string | null;
+}
+
 export const getAccountOverview = async () => {
   const data = (await api.get('/account')).data.data as Omit<AccountOverview, 'defaultAddress'> & { defaultAddress: AddressWire | null };
   return { ...data, defaultAddress: data.defaultAddress ? normalizeAddress(data.defaultAddress) : null } as AccountOverview;
@@ -84,3 +94,7 @@ export const markAllNotificationsRead = async () =>
   (await api.patch('/account/notifications/read-all')).data.data;
 export const listSessions = async () => (await api.get('/account/sessions')).data.data as AccountSession[];
 export const revokeSession = async (id: string) => (await api.delete(`/account/sessions/${id}`)).data.data;
+export const exportPersonalData = async () => (await api.get('/account/privacy/export')).data.data as Record<string, unknown>;
+export const listPersonalDataRequests = async () => (await api.get('/account/privacy/requests')).data.data as PersonalDataRequest[];
+export const createPersonalDataRequest = async (payload: { requestType: PersonalDataRequest['requestType']; reason?: string }) =>
+  (await api.post('/account/privacy/requests', payload)).data.data as Pick<PersonalDataRequest, 'id' | 'requestType' | 'status'>;

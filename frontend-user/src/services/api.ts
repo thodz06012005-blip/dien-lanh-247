@@ -21,6 +21,9 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (!config.headers.has('X-Request-Id')) config.headers.set('X-Request-Id', createRequestId());
+  if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() ?? '')) {
+    config.headers.set('X-CSRF-Protection', '1');
+  }
   return config;
 });
 

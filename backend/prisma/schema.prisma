@@ -528,3 +528,20 @@ model Contact {
   message   String   @db.Text
   createdAt DateTime @default(now())
 }
+
+model PersonalDataRequest {
+  id            String   @id @db.Char(36)
+  userId        Int
+  requestType   String   @db.VarChar(32)
+  status        String   @default("RECEIVED") @db.VarChar(32)
+  reason        String?  @db.VarChar(500)
+  legalHoldNote String?  @db.VarChar(500)
+  requestedAt   DateTime @default(now())
+  dueAt         DateTime
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, requestedAt])
+  @@index([status, dueAt])
+}

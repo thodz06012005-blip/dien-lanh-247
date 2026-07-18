@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
+import { reportClientError } from '@/observability/errorReporter';
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -28,6 +29,7 @@ export default class AppErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    reportClientError(error, 'react-boundary', info.componentStack ?? '');
     if (import.meta.env.DEV) {
       console.error('Unhandled customer application error', error, info.componentStack);
     }

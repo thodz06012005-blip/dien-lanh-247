@@ -9,6 +9,7 @@ import { HttpErrorFilter } from './common/filters/http-exception.filter';
 import { requestContextMiddleware } from './common/middleware/request-context.middleware';
 import {
   contentTypeGuardMiddleware,
+  csrfProtectionMiddleware,
   helmetSecurityMiddleware,
 } from './common/middleware/security.middleware';
 import { createValidationException } from './common/validation/validation-exception.factory';
@@ -33,6 +34,11 @@ async function bootstrap() {
   );
   const mediaStoragePath =
     config.get<string>('MEDIA_STORAGE_PATH') || join(process.cwd(), 'storage');
+  const corsOrigins = config
+    .get<string>('CORS_ORIGINS', '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
   if (apiPrefix) app.setGlobalPrefix(apiPrefix);
 
@@ -46,6 +52,7 @@ async function bootstrap() {
   app.use(requestContextMiddleware);
   app.use(helmetSecurityMiddleware);
   app.use(cookieParser());
+  app.use(csrfProtectionMiddleware(corsOrigins));
   app.use(
     '/uploads',
     serveStatic(mediaStoragePath, {
@@ -71,12 +78,6 @@ async function bootstrap() {
     }),
   );
 
-  const corsOrigins = config
-    .get<string>('CORS_ORIGINS', '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-
   app.enableCors({
     origin(
       origin: string | undefined,
@@ -96,6 +97,7 @@ async function bootstrap() {
       'Content-Type',
       'Cookie',
       'X-Confirm-Dangerous-Action',
+      'X-CSRF-Protection',
       'X-Request-Id',
       'X-Requested-With',
     ],
@@ -119,7 +121,9 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   await app.listen(port, host);
-  console.log(`Điện Lạnh 247 API listening on http://${host}:${port}/${apiPrefix}`);
+  console.log(
+    `Điện Lạnh 247 API listening on http://${host}:${port}/${apiPrefix}`,
+  );
 }
 
 void bootstrap().catch((error: unknown) => {

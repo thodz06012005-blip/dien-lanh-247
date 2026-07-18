@@ -6,6 +6,7 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { SuperAdminStepUpGuard } from '../../common/guards/super-admin-step-up.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditLogService } from '../audit/audit-log.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
@@ -31,13 +32,20 @@ export class SettingsController {
     return this.settingsService.getAdminSettings();
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, SuperAdminStepUpGuard)
+  @Roles(UserRole.SUPERADMIN)
   @Permissions(ADMIN_PERMISSIONS.SETTINGS_MANAGE)
   @Patch('admin/settings')
   async updateSettings(@Body() dto: UpdateSettingsDto, @Req() req: Request) {
     const result = await this.settingsService.updateSettings(dto);
-    this.auditLogService.auditSuccess(req, 'SETTINGS_UPDATED', 'settings', 'default', dto, 'System settings updated successfully');
+    this.auditLogService.auditSuccess(
+      req,
+      'SETTINGS_UPDATED',
+      'settings',
+      'default',
+      dto,
+      'System settings updated successfully',
+    );
     return result;
   }
 }

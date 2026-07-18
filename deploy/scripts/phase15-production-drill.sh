@@ -84,7 +84,7 @@ node scripts/smoke-production.mjs 2>&1 | tee phase15-evidence/production-smoke.l
 
 started_at=$(date +%s)
 "${compose[@]}" exec -T backend node scripts/backup-mysql.mjs 2>&1 | tee phase15-evidence/backup.log
-backup_file=$("${compose[@]}" exec -T backend sh -c 'ls -1t /app/var/backups/*.sql.gz | head -1' | tr -d '\r')
+backup_file=$("${compose[@]}" exec -T backend sh -c 'ls -1t /app/var/backups/*.sql.gz.enc | head -1' | tr -d '\r')
 test -n "$backup_file"
 
 "${compose[@]}" exec -T db sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot' <<'SQL'
