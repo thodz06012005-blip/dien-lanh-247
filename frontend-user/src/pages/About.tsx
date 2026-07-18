@@ -69,11 +69,8 @@ export default function About() {
         <div className="relative pb-8 sm:pl-8">
           <div className="overflow-hidden rounded-[2.25rem] bg-slate-100 shadow-2xl shadow-slate-900/10">
             <OptimizedImage
-              src="https://images.unsplash.com/photo-1581092160562-40aa08e78837"
-              alt="Kỹ thuật viên trao đổi kế hoạch công việc"
+              assetKey="about.team"
               priority
-              width={1200}
-              height={900}
               sizes="(max-width: 1024px) 100vw, 52vw"
               className="aspect-[4/3] h-full w-full object-cover"
             />
@@ -152,6 +149,7 @@ export default function About() {
           <OptimizedImage
             src="https://images.unsplash.com/photo-1581092334651-ddf26d9a09d0"
             alt="Kỹ thuật viên kiểm tra thiết bị"
+            assetKey="service.detail"
             width={1000}
             height={800}
             sizes="(max-width: 1024px) 100vw, 50vw"

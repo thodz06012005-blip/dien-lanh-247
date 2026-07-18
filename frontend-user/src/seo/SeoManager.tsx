@@ -57,6 +57,10 @@ const staticSeo: Record<string, SeoEntry> = {
     title: 'Liên hệ Điện Lạnh 247',
     description: 'Liên hệ Điện Lạnh 247 để được tư vấn, báo giá và đặt lịch sửa chữa điện lạnh nhanh chóng.',
   },
+  '/faq': {
+    title: 'Câu hỏi thường gặp | Điện Lạnh 247',
+    description: 'Giải đáp về đặt lịch, báo giá, linh kiện theo dịch vụ, thanh toán, bảo hành và dữ liệu khách hàng.',
+  },
   '/service-booking': {
     title: 'Đặt lịch dịch vụ điện lạnh | Điện Lạnh 247',
     description: 'Đặt lịch sửa chữa hoặc bảo trì điện lạnh trực tuyến chỉ trong vài bước, nhận mã theo dõi và xác nhận lịch rõ ràng.',
@@ -77,6 +81,11 @@ const staticSeo: Record<string, SeoEntry> = {
     title: 'Phương thức thanh toán | Điện Lạnh 247',
     description: 'Các phương thức thanh toán an toàn và quy trình xác nhận thanh toán tại Điện Lạnh 247.',
   },
+  '/policy/booking': { title: 'Chính sách đặt lịch | Điện Lạnh 247', description: 'Điều kiện gửi yêu cầu, xác nhận lịch và điều phối kỹ thuật viên.' },
+  '/policy/cancellation': { title: 'Chính sách hủy và đổi lịch | Điện Lạnh 247', description: 'Điều kiện hủy, đổi lịch và chi phí có thể phát sinh.' },
+  '/policy/pricing': { title: 'Chính sách báo giá và chi phí | Điện Lạnh 247', description: 'Nguyên tắc giá tham khảo, phí khảo sát, báo giá và vật tư theo dịch vụ.' },
+  '/policy/complaints': { title: 'Chính sách khiếu nại | Điện Lạnh 247', description: 'Kênh, thời gian và quy trình tiếp nhận khiếu nại dịch vụ.' },
+  '/policy/cookies': { title: 'Chính sách cookie | Điện Lạnh 247', description: 'Thông tin về cookie cần thiết, đo lường và lựa chọn của người dùng.' },
 };
 
 const privateSeo: Record<string, SeoEntry> = {

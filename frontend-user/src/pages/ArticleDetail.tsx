@@ -40,7 +40,7 @@ export default function ArticleDetail() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-5 text-sm text-slate-500"><span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4" />{post.authorName?.trim() || 'Ban biên tập Điện Lạnh 247'}</span><span className="inline-flex items-center gap-2"><CalendarDays className="h-4 w-4" />{formatDate(post.publishedAt)}</span></div>
         </header>
 
-        <OptimizedImage src={post.coverUrl || 'https://images.unsplash.com/photo-1508514177221-188b1cf16e9d'} alt={post.coverAlt || post.title} width={1400} height={850} priority className="mt-10 aspect-[16/9] w-full rounded-[2rem] object-cover shadow-xl" />
+        <OptimizedImage src={post.coverUrl} alt={post.coverAlt || post.title} assetKey="article.cover" width={1400} height={850} priority className="mt-10 aspect-[16/9] w-full rounded-[2rem] object-cover shadow-xl" />
 
         <div className="mx-auto mt-12 max-w-3xl">
           <div className="prose prose-slate prose-headings:font-black prose-a:text-blue-700 max-w-none leading-8" dangerouslySetInnerHTML={{ __html: post.content || '<p>Nội dung đang được cập nhật.</p>' }} />

@@ -19,6 +19,7 @@ import QuickContactForm from '@/components/contact/QuickContactForm';
 import CmsManagedHomepage from '@/components/cms/CmsManagedHomepage';
 import PricingTable from '@/components/home/PricingTable';
 import { articles, processSteps, projects, reasons, services, testimonials } from '@/data/phase4Content';
+import { serviceFaq } from '@/data/servicePolicies';
 import useDocumentTitle from '@/hooks/useDocumentTitle';
 import { useSettings } from '@/hooks/useSettings';
 
@@ -75,14 +76,11 @@ export default function Home() {
     <div className="overflow-hidden bg-white">
       <section className="relative isolate overflow-hidden bg-[#061527] text-white">
         <OptimizedImage
-          src="https://images.unsplash.com/photo-1621905252472-e4b5d9fbe0c5"
-          alt="Kỹ thuật viên kiểm tra hệ thống điều hòa"
+          assetKey="home.hero"
           priority
-          width={1600}
-          height={900}
           widths={[480, 768, 1024, 1440]}
           sizes="100vw"
-          className="absolute inset-0 -z-20 h-full w-full object-cover opacity-35"
+          className="absolute inset-0 -z-20 h-full w-full object-cover object-[68%_center] opacity-38"
         />
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(3,12,24,0.98),rgba(6,21,39,0.9)_55%,rgba(6,21,39,0.64))]" />
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_80%_15%,rgba(6,182,212,0.22),transparent_32%),radial-gradient(circle_at_10%_90%,rgba(37,99,235,0.2),transparent_35%)]" />
@@ -175,6 +173,7 @@ export default function Home() {
                   <OptimizedImage
                     src={service.image}
                     alt={service.title}
+                    assetKey="service.card"
                     width={720}
                     height={450}
                     sizes="(max-width: 768px) 100vw, 33vw"
@@ -208,10 +207,7 @@ export default function Home() {
           <div className="relative pb-6">
             <div className="overflow-hidden rounded-[2rem] bg-slate-100 shadow-2xl">
               <OptimizedImage
-                src="https://images.unsplash.com/photo-1581092160562-40aa08e78837"
-                alt="Đội ngũ kỹ thuật viên Điện Lạnh 247"
-                width={1000}
-                height={750}
+                assetKey="about.team"
                 sizes="(max-width: 1024px) 100vw, 50vw"
                 className="aspect-[4/3] h-full w-full object-cover"
               />
@@ -264,6 +260,7 @@ export default function Home() {
                 <OptimizedImage
                   src={project.image}
                   alt={project.title}
+                  assetKey="project.cover"
                   width={900}
                   height={620}
                   sizes="(max-width: 1024px) 100vw, 50vw"
@@ -339,7 +336,7 @@ export default function Home() {
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {articles.slice(0, 3).map((article) => (
               <article key={article.slug} className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
-                <OptimizedImage src={article.image} alt={article.title} width={720} height={440} sizes="(max-width: 768px) 100vw, 33vw" className="aspect-[16/10] h-full w-full object-cover" />
+                <OptimizedImage src={article.image} alt={article.title} assetKey="article.cover" width={720} height={440} sizes="(max-width: 768px) 100vw, 33vw" className="aspect-[16/10] h-full w-full object-cover" />
                 <div className="p-6">
                   <div className="flex gap-2 text-xs font-bold text-primary-700"><span>{article.category}</span><span>•</span><span>{article.readTime}</span></div>
                   <h3 className="mt-3 line-clamp-2 text-lg font-black text-slate-950">{article.title}</h3>
@@ -347,6 +344,27 @@ export default function Home() {
                   <Link to={`/articles/${article.slug}`} className="mt-5 inline-flex items-center gap-2 text-sm font-black text-primary-700">Đọc bài viết <ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
                 </div>
               </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white py-20 sm:py-24" aria-labelledby="home-faq-title">
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.75fr_1.25fr] lg:px-8">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary-700">Câu hỏi thường gặp</p>
+            <h2 id="home-faq-title" className="mt-3 text-3xl font-black tracking-tight text-slate-950">Rõ lịch, rõ giá, rõ trách nhiệm</h2>
+            <p className="mt-4 text-sm leading-7 text-slate-600">Các điểm quan trọng được giải thích trước khi khách hàng gửi yêu cầu và trước khi kỹ thuật viên thực hiện công việc.</p>
+            <Link to="/faq" className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-950 px-5 text-sm font-black text-white">Xem toàn bộ câu hỏi <ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
+          </div>
+          <div className="grid gap-3">
+            {serviceFaq.slice(0, 4).map((item) => (
+              <details key={item.question} className="group rounded-2xl border border-slate-200 bg-slate-50 open:bg-white open:shadow-md">
+                <summary className="ds-focus-ring flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-5 py-4 text-sm font-black text-slate-900 [&::-webkit-details-marker]:hidden">
+                  {item.question}<span aria-hidden="true" className="text-xl text-primary-700 group-open:rotate-45">+</span>
+                </summary>
+                <p className="border-t border-slate-200 px-5 py-4 text-sm leading-7 text-slate-600">{item.answer}</p>
+              </details>
             ))}
           </div>
         </div>

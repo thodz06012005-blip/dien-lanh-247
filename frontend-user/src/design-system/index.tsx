@@ -772,6 +772,67 @@ export function Pagination({ page, pageCount, onPageChange }: PaginationProps) {
   );
 }
 
+export interface ResponsiveTableColumn<T> {
+  key: string;
+  header: string;
+  render: (row: T) => ReactNode;
+  align?: 'left' | 'center' | 'right';
+  hideOnMobile?: boolean;
+}
+
+export interface ResponsiveTableProps<T> {
+  caption: string;
+  rows: T[];
+  columns: Array<ResponsiveTableColumn<T>>;
+  rowKey: (row: T) => string | number;
+  emptyTitle?: string;
+  emptyDescription?: string;
+}
+
+export function ResponsiveTable<T>({
+  caption,
+  rows,
+  columns,
+  rowKey,
+  emptyTitle = 'Chưa có dữ liệu',
+  emptyDescription = 'Dữ liệu sẽ xuất hiện khi có bản ghi phù hợp.',
+}: ResponsiveTableProps<T>) {
+  if (!rows.length) {
+    return <StatePanel state="empty" title={emptyTitle} description={emptyDescription} />;
+  }
+
+  const alignment = { left: 'text-left', center: 'text-center', right: 'text-right' };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="hidden max-w-full overflow-x-auto md:block" tabIndex={0} role="region" aria-label={caption}>
+        <table className="min-w-full border-collapse text-sm">
+          <caption className="sr-only">{caption}</caption>
+          <thead className="bg-slate-50 text-slate-700">
+            <tr>{columns.map((column) => <th key={column.key} scope="col" className={cn('whitespace-nowrap border-b border-slate-200 px-4 py-3 font-black', alignment[column.align || 'left'])}>{column.header}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map((row) => <tr key={rowKey(row)} className="hover:bg-slate-50/80">{columns.map((column) => <td key={column.key} className={cn('px-4 py-4 align-top text-slate-700', alignment[column.align || 'left'])}>{column.render(row)}</td>)}</tr>)}
+          </tbody>
+        </table>
+      </div>
+
+      <ul className="divide-y divide-slate-200 md:hidden" aria-label={caption}>
+        {rows.map((row) => (
+          <li key={rowKey(row)} className="grid gap-3 p-4">
+            {columns.filter((column) => !column.hideOnMobile).map((column) => (
+              <div key={column.key} className="grid grid-cols-[minmax(7rem,0.8fr)_1.2fr] gap-3 text-sm">
+                <span className="font-bold text-slate-500">{column.header}</span>
+                <span className="min-w-0 text-right text-slate-800">{column.render(row)}</span>
+              </div>
+            ))}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 type ToastVariant = 'info' | 'success' | 'warning' | 'danger';
 
 interface ToastItem {

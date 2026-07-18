@@ -41,7 +41,7 @@ export default function Projects() {
         <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <article key={project.id} className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
-              <OptimizedImage src={project.coverUrl || 'https://images.unsplash.com/photo-1497366754035-f200968a6e72'} alt={project.coverAlt || project.title} width={800} height={520} sizes="(max-width: 768px) 100vw, 33vw" className="aspect-[16/10] w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
+              <OptimizedImage src={project.coverUrl} alt={project.coverAlt || project.title} assetKey="project.cover" width={800} height={520} sizes="(max-width: 768px) 100vw, 33vw" className="aspect-[16/10] w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
               <div className="p-6">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-500"><MapPin className="h-4 w-4 text-blue-600" />{project.location || 'Đang cập nhật địa điểm'}</div>
                 <h2 className="mt-3 text-xl font-black text-slate-950">{project.title}</h2>

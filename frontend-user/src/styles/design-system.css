@@ -50,8 +50,17 @@
 }
 
 .ds-focus-ring:focus-visible {
-  outline: 3px solid rgb(37 99 235 / 0.35);
-  outline-offset: 2px;
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
+:where(h1, h2, h3, [role='alert'], [role='status']) {
+  scroll-margin-top: 8rem;
 }
 
 .ds-skip-link {
@@ -119,5 +128,15 @@
     animation: none !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 3px solid CanvasText;
+  }
+
+  .ds-skip-link {
+    border: 2px solid CanvasText;
   }
 }

@@ -14,6 +14,12 @@ interface CmsManagedHomepageProps {
   fallbackTestimonials: FallbackTestimonial[];
 }
 
+const commerceCopy = /\b(?:sản phẩm|giỏ hàng|checkout|đơn hàng|giao hàng|đổi trả|hoàn trả|mua ngay|mua hàng|khuyến mãi|voucher|coupon|bán lẻ|retail)\b/i;
+
+function containsCommerceCopy(...values: Array<string | null | undefined>) {
+  return values.some((value) => commerceCopy.test(String(value || '')));
+}
+
 function resolveMedia(value?: string | null) {
   const url = String(value || '');
   if (!url.startsWith('/')) return url;
@@ -40,16 +46,19 @@ function sanitizeManagedHtml(value: string) {
 function Cta({ href, label, variant = 'primary' }: { href?: string | null; label?: string | null; variant?: 'primary' | 'secondary' }) {
   if (!href || !label) return null;
   const safeHref = serviceOnlyHref(href);
+  const safeLabel = containsCommerceCopy(label)
+    ? safeHref.includes('service-booking') ? 'Đặt lịch dịch vụ' : 'Xem dịch vụ'
+    : label;
   const className = variant === 'primary'
     ? 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 motion-reduce:transform-none'
     : 'inline-flex min-h-11 items-center justify-center rounded-xl border border-white/20 bg-white/10 px-5 text-sm font-black text-white backdrop-blur transition hover:bg-white/15';
   return safeHref.startsWith('/') ? (
     <Link to={safeHref} className={className}>
-      {label}<ArrowRight className="h-4 w-4" />
+      {safeLabel}<ArrowRight className="h-4 w-4" />
     </Link>
   ) : (
     <a href={safeHref} target="_blank" rel="noopener noreferrer" className={className}>
-      {label}<ArrowRight className="h-4 w-4" />
+      {safeLabel}<ArrowRight className="h-4 w-4" />
     </a>
   );
 }
@@ -93,16 +102,18 @@ export default function CmsManagedHomepage({ fallbackTestimonials }: CmsManagedH
     retry: 1,
   });
   const bundle: SiteContentBundle | undefined = query.data;
-  const testimonials = bundle?.testimonials?.length
-    ? bundle.testimonials.map((item) => ({
+  const safeManagedTestimonials = bundle?.testimonials?.filter((item) => !containsCommerceCopy(item.quote, item.serviceTitle));
+  const testimonials = safeManagedTestimonials?.length
+    ? safeManagedTestimonials.map((item) => ({
         name: item.customerName,
         role: [item.customerTitle, item.company].filter(Boolean).join(' · ') || item.serviceTitle || 'Khách hàng Điện Lạnh 247',
         rating: Math.max(1, Math.min(5, Number(item.rating) || 5)),
         quote: item.quote,
       }))
     : fallbackTestimonials;
-  const campaign = bundle?.banners?.find((item) => item.placement !== 'HOME_HERO') || bundle?.banners?.[0];
-  const sections = bundle?.sections?.filter((item) => item.sectionKey.startsWith('HOME_') && item.sectionKey !== 'HOME_HERO') || [];
+  const safeBanners = bundle?.banners?.filter((item) => !containsCommerceCopy(item.eyebrow, item.title, item.subtitle, item.ctaLabel, item.secondaryCtaLabel)) || [];
+  const campaign = safeBanners.find((item) => item.placement !== 'HOME_HERO') || safeBanners[0];
+  const sections = bundle?.sections?.filter((item) => item.sectionKey.startsWith('HOME_') && item.sectionKey !== 'HOME_HERO' && !containsCommerceCopy(item.eyebrow, item.title, item.content)) || [];
 
   return (
     <>

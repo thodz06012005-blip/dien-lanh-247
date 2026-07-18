@@ -72,8 +72,8 @@ test('optimized images reserve space and support responsive lazy loading', () =>
   assert.match(image, /sizes=/);
   assert.match(image, /loading=\{priority \? 'eager' : 'lazy'\}/);
   assert.match(image, /decoding="async"/);
-  assert.match(image, /width=\{width\}/);
-  assert.match(image, /height=\{height\}/);
+  assert.match(image, /width=\{resolvedWidth\}/);
+  assert.match(image, /height=\{resolvedHeight\}/);
   assert.match(image, /fetchPriority=/);
 });
 

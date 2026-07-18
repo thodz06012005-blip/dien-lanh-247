@@ -1,11 +1,12 @@
 import type { ImgHTMLAttributes } from 'react';
 import OptimizedImage from './OptimizedImage';
+import type { ImageAssetKey } from '@/config/imageAssets';
 
 interface ImageWithFallbackProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'srcSet'> {
   fallbackSrc?: string;
   widths?: number[];
   sizes?: string;
-  assetKey?: string;
+  assetKey?: ImageAssetKey;
 }
 
 /**
@@ -14,8 +15,8 @@ interface ImageWithFallbackProps extends Omit<ImgHTMLAttributes<HTMLImageElement
  */
 export default function ImageWithFallback({
   src = '',
-  alt = 'Hình ảnh sản phẩm',
-  fallbackSrc = '/images/placeholders/anh-bg-khong-co-hinh-01.svg',
+  alt = 'Hình ảnh minh họa dịch vụ',
+  fallbackSrc = '/images/placeholders/image-unavailable.svg',
   widths = [240, 360, 480, 720],
   sizes = '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw',
   loading = 'lazy',

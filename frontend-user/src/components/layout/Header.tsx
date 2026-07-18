@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   CalendarDays,
@@ -19,6 +19,7 @@ const navigation = [
   { label: 'Tra cứu', to: '/service-lookup', icon: Search },
   { label: 'Dự án', to: '/projects' },
   { label: 'Bài viết', to: '/articles' },
+  { label: 'FAQ', to: '/faq' },
   { label: 'Giới thiệu', to: '/about' },
   { label: 'Liên hệ', to: '/contact' },
 ];
@@ -27,6 +28,9 @@ export default function Header() {
   const { settings } = useSettings();
   const { isAuthenticated, user, logout } = useAuthStore();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLElement>(null);
+  const mobileTriggerRef = useRef<HTMLButtonElement>(null);
+  const mobileCloseRef = useRef<HTMLButtonElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const hotline = settings?.hotline || '1900 1234';
@@ -39,14 +43,28 @@ export default function Header() {
   useEffect(() => {
     if (!mobileOpen) return undefined;
     const previousOverflow = document.body.style.overflow;
+    const trigger = mobileTriggerRef.current;
     document.body.style.overflow = 'hidden';
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMobileOpen(false);
+    window.requestAnimationFrame(() => mobileCloseRef.current?.focus());
+    const handleMenuKeyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMobileOpen(false);
+        return;
+      }
+      if (event.key !== 'Tab' || !mobileMenuRef.current) return;
+      const focusable = Array.from(mobileMenuRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     };
-    document.addEventListener('keydown', closeOnEscape);
+    document.addEventListener('keydown', handleMenuKeyboard);
     return () => {
       document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', closeOnEscape);
+      document.removeEventListener('keydown', handleMenuKeyboard);
+      trigger?.focus();
     };
   }, [mobileOpen]);
 
@@ -106,7 +124,7 @@ export default function Header() {
               <span className="hidden max-w-24 truncate lg:block">{isAuthenticated ? user?.firstName || 'Tài khoản' : 'Đăng nhập'}</span>
             </Link>
 
-            <button type="button" onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 xl:hidden" aria-label="Mở menu" aria-expanded={mobileOpen} aria-controls="customer-mobile-menu">
+            <button ref={mobileTriggerRef} type="button" onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 xl:hidden" aria-label="Mở menu" aria-expanded={mobileOpen} aria-controls="customer-mobile-menu">
               <Menu aria-hidden="true" className="h-6 w-6" />
             </button>
           </div>
@@ -116,10 +134,10 @@ export default function Header() {
       {mobileOpen && (
         <div className="fixed inset-0 z-[60] xl:hidden" id="customer-mobile-menu">
           <button type="button" className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} aria-label="Đóng menu" />
-          <aside className="absolute bottom-0 right-0 top-0 flex w-[min(88vw,380px)] flex-col overflow-y-auto bg-white shadow-2xl" aria-label="Menu di động">
+          <aside ref={mobileMenuRef} role="dialog" aria-modal="true" className="absolute bottom-0 right-0 top-0 flex w-[min(88vw,380px)] flex-col overflow-y-auto bg-white shadow-2xl" aria-label="Menu di động">
             <div className="flex items-center justify-between border-b border-slate-200 p-4">
               <Link to="/" className="flex items-center gap-2 font-black text-slate-950"><span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-700 text-white">D</span>Điện Lạnh <span className="text-primary-700">247</span></Link>
-              <button type="button" onClick={() => setMobileOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100" aria-label="Đóng menu"><X aria-hidden="true" className="h-6 w-6" /></button>
+              <button ref={mobileCloseRef} type="button" onClick={() => setMobileOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100" aria-label="Đóng menu"><X aria-hidden="true" className="h-6 w-6" /></button>
             </div>
 
             <nav className="grid gap-1 p-4" aria-label="Điều hướng di động">

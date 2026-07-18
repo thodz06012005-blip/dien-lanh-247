@@ -1,0 +1,62 @@
+name: Phase 7-8 content and accessibility
+
+on:
+  push:
+    branches: ['agent/phase-7-8-*']
+  pull_request:
+    paths:
+      - 'frontend-user/**'
+      - 'backend/prisma/seed-content.ts'
+      - 'backend/prisma/seed-editorial-cms.ts'
+      - 'docs/phase-7/**'
+      - 'docs/phase-8/**'
+      - 'tests/architecture/phase7_8_content_accessibility.test.mjs'
+      - '.github/workflows/phase7-8-content-accessibility.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase7-8-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  content-accessibility:
+    name: Content, policy, accessibility and customer build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend-user/package-lock.json
+      - name: Install customer dependencies
+        run: |
+          npm ci
+          npm --prefix frontend-user ci
+      - name: Secret and architecture gates
+        run: |
+          npm run security:scan
+          node --test tests/architecture/phase7_8_content_accessibility.test.mjs
+          npm --prefix frontend-user run test:architecture
+      - name: Customer lint, typecheck and build
+        run: |
+          npm --prefix frontend-user run lint
+          npm --prefix frontend-user run typecheck
+          npm run build:user
+      - name: Upload policy and UX evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase7-8-content-accessibility-evidence
+          path: |
+            docs/phase-7/
+            docs/phase-8/
+            frontend-user/dist/
+          if-no-files-found: warn
+          retention-days: 30

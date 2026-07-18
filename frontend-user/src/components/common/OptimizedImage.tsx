@@ -1,15 +1,16 @@
 import { useState, type ImgHTMLAttributes } from 'react';
 import { cn } from '@/design-system';
+import { getImageAsset, type ImageAssetKey } from '@/config/imageAssets';
 
-interface OptimizedImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'srcSet' | 'loading'> {
-  src: string;
-  alt: string;
+interface OptimizedImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'srcSet' | 'loading' | 'src' | 'alt'> {
+  src?: string;
+  alt?: string;
   priority?: boolean;
   widths?: number[];
   sizes?: string;
   fallbackClassName?: string;
   fallbackSrc?: string;
-  assetKey?: string;
+  assetKey?: ImageAssetKey;
 }
 
 function appendImageParams(src: string, width: number, format?: 'avif' | 'webp') {
@@ -30,22 +31,32 @@ export default function OptimizedImage({
   sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 1200px',
   className,
   fallbackClassName,
-  fallbackSrc = '/images/placeholders/anh-bg-khong-co-hinh-01.svg',
+  fallbackSrc,
   assetKey,
-  width = 1200,
-  height = 800,
+  width,
+  height,
   onError,
   ...props
 }: OptimizedImageProps) {
   const [hasError, setHasError] = useState(false);
   const [hasFallbackError, setHasFallbackError] = useState(false);
-  const supportsResponsiveSource = /images\.unsplash\.com|images\.pexels\.com/.test(src);
-  const resolvedSrc = supportsResponsiveSource ? appendImageParams(src, Number(width) || 1200, 'webp') : src;
+  const asset = getImageAsset(assetKey);
+  const requestedSource = src || asset?.src || asset?.fallbackSrc || '/images/placeholders/image-unavailable.svg';
+  const resolvedAlt = alt || asset?.alt || 'Hình ảnh minh họa dịch vụ';
+  const resolvedWidth = Number(width || asset?.width || 1200);
+  const resolvedHeight = Number(height || asset?.height || 800);
+  const resolvedFallback = fallbackSrc || asset?.fallbackSrc || '/images/placeholders/image-unavailable.svg';
+  const isRemoteSource = /^https?:\/\//i.test(requestedSource);
+  const source = priority && isRemoteSource && asset ? asset.src : requestedSource;
+  const supportsRemoteResponsiveSource = /images\.unsplash\.com|images\.pexels\.com/.test(source);
+  const resolvedSrc = supportsRemoteResponsiveSource ? appendImageParams(source, resolvedWidth, 'webp') : source;
+  const localSrcSet = source === asset?.src ? asset?.srcSet : undefined;
 
   if (hasError && priority) {
     return (
       <div
-        aria-hidden="true"
+        role="img"
+        aria-label={resolvedAlt}
         data-image-key={assetKey}
         className={cn(
           'pointer-events-none bg-gradient-to-br from-slate-950 via-blue-950 to-cyan-950',
@@ -59,10 +70,10 @@ export default function OptimizedImage({
   if (hasError && !hasFallbackError) {
     return (
       <img
-        src={fallbackSrc}
-        alt={alt}
-        width={width}
-        height={height}
+        src={resolvedFallback}
+        alt={resolvedAlt}
+        width={resolvedWidth}
+        height={resolvedHeight}
         loading="lazy"
         decoding="async"
         data-image-key={assetKey}
@@ -76,7 +87,7 @@ export default function OptimizedImage({
     return (
       <div
         role="img"
-        aria-label={alt}
+        aria-label={resolvedAlt}
         data-image-key={assetKey}
         className={cn(
           'flex min-h-40 items-center justify-center bg-gradient-to-br from-slate-100 to-blue-50 p-6 text-center text-sm font-semibold text-slate-500',
@@ -92,11 +103,11 @@ export default function OptimizedImage({
   const image = (
     <img
       src={resolvedSrc}
-      srcSet={supportsResponsiveSource ? buildSrcSet(src, widths, 'webp') : undefined}
-      sizes={supportsResponsiveSource ? sizes : undefined}
-      alt={alt}
-      width={width}
-      height={height}
+      srcSet={localSrcSet || (supportsRemoteResponsiveSource ? buildSrcSet(source, widths, 'webp') : undefined)}
+      sizes={localSrcSet || supportsRemoteResponsiveSource ? sizes : undefined}
+      alt={resolvedAlt}
+      width={resolvedWidth}
+      height={resolvedHeight}
       loading={priority ? 'eager' : 'lazy'}
       fetchPriority={priority ? 'high' : 'auto'}
       decoding="async"
@@ -110,11 +121,11 @@ export default function OptimizedImage({
     />
   );
 
-  if (!supportsResponsiveSource) return image;
+  if (!supportsRemoteResponsiveSource) return image;
   return (
     <picture data-image-key={assetKey}>
-      <source type="image/avif" srcSet={buildSrcSet(src, widths, 'avif')} sizes={sizes} />
-      <source type="image/webp" srcSet={buildSrcSet(src, widths, 'webp')} sizes={sizes} />
+      <source type="image/avif" srcSet={buildSrcSet(source, widths, 'avif')} sizes={sizes} />
+      <source type="image/webp" srcSet={buildSrcSet(source, widths, 'webp')} sizes={sizes} />
       {image}
     </picture>
   );
