@@ -46,6 +46,7 @@ jobs:
       VITE_API_TIMEOUT_MS: '15000'
       VITE_USE_MOCK_API: 'true'
       VITE_SERVICE_ONLY_MODE: 'true'
+      VITE_ENABLE_QUERY_DEVTOOLS: 'false'
 
     steps:
       - uses: actions/checkout@v4
