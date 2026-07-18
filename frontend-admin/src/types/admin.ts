@@ -1,9 +1,5 @@
 export type AdminPermission =
   | 'dashboard.view'
-  | 'orders.view'
-  | 'orders.manage'
-  | 'products.view'
-  | 'products.manage'
   | 'customers.view'
   | 'customers.manage'
   | 'services.view'
@@ -16,7 +12,7 @@ export type AdminPermission =
   | 'content.manage'
   | 'settings.view'
   | 'settings.manage'
-  | 'design-system.view'
+  | 'notifications.view'
   | 'profile.view'
   | 'profile.manage'
   | 'audit.view';

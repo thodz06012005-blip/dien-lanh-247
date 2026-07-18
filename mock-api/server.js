@@ -25,7 +25,7 @@ const { resolveServiceOnlyMode, serviceOnlyMiddleware } = require('./config/serv
 
 const publicRoutes = require('./routes/public');
 const { router: serviceRequestRouter, updateTechnicianStatusAfterJobChange } = require('./routes/serviceRequests');
-const { adminUsers, adminSessions, requireAdminAuth, isDemoAccountsEnabled } = require('./utils/auth');
+const { adminUsers, adminSessions, requireAdminAuth, isDemoAccountsEnabled, getUiPermissions } = require('./utils/auth');
 const technicianRouter = require('./routes/technicians');
 const ordersRouter = require('./routes/orders');
 const adminProductsRouter = require('./routes/adminProducts');
@@ -248,7 +248,8 @@ app.post('/api/v1/admin/auth/login', (req, res) => {
     maxAge: 30 * 60 * 1000 // 30 minutes
   });
 
-  const { password: _, ...adminSafe } = admin;
+  const { password: _, ...adminWithoutPassword } = admin;
+  const adminSafe = { ...adminWithoutPassword, permissions: getUiPermissions(admin.role) };
   return respondSuccess(res, {
     admin: adminSafe,
     token,
@@ -258,8 +259,7 @@ app.post('/api/v1/admin/auth/login', (req, res) => {
 
 // GET /admin/auth/me
 app.get('/api/v1/admin/auth/me', requireAdminAuth, (req, res) => {
-  const { password: _, ...adminSafe } = req.admin;
-  return respondSuccess(res, { admin: adminSafe }, 'Lấy thông tin admin thành công');
+  return respondSuccess(res, { admin: req.admin }, 'Lấy thông tin admin thành công');
 });
 
 // POST /admin/auth/logout

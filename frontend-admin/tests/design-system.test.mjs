@@ -62,11 +62,11 @@ test('admin design system includes touch, focus, overflow and reduced-motion saf
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
-test('admin demo page and permission-aware layout integration are available', () => {
+test('admin design primitives remain available without exposing an internal demo route', () => {
   assert.equal(existsSync(resolve(root, 'src/pages/DesignSystem.tsx')), true);
-  assert.match(read('src/router/AppRouter.tsx'), /path="design-system"/);
+  assert.doesNotMatch(read('src/router/AppRouter.tsx'), /path="design-system"/);
   assert.match(read('src/main.tsx'), /styles\/design-system\.css/);
   assert.match(read('src/layouts/AdminLayout.tsx'), /admin-skip-link/);
-  assert.match(read('src/config/adminNavigation.ts'), /Thư viện giao diện/);
-  assert.match(read('src/config/adminNavigation.ts'), /DESIGN_SYSTEM_VIEW/);
+  assert.doesNotMatch(read('src/config/adminNavigation.ts'), /Thư viện giao diện/);
+  assert.doesNotMatch(read('src/config/adminNavigation.ts'), /DESIGN_SYSTEM_VIEW/);
 });

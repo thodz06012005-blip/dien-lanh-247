@@ -102,6 +102,32 @@ const ROLE_PERMISSIONS = {
   ]
 };
 
+// Dot-separated permissions mirror the real backend contract consumed by the
+// admin frontend. Route middleware keeps its colon-separated permissions until
+// the commerce routers are removed in Phase 4.
+const UI_ROLE_PERMISSIONS = {
+  superadmin: [
+    'dashboard.view', 'customers.view', 'customers.manage', 'services.view',
+    'services.manage', 'technicians.view', 'technicians.manage',
+    'operations.view', 'operations.manage', 'content.view', 'content.manage',
+    'settings.view', 'settings.manage', 'notifications.view', 'profile.view',
+    'profile.manage', 'audit.view'
+  ],
+  admin: [
+    'dashboard.view', 'customers.view', 'customers.manage', 'services.view',
+    'services.manage', 'technicians.view', 'technicians.manage',
+    'operations.view', 'operations.manage', 'content.view', 'content.manage',
+    'settings.view', 'notifications.view', 'profile.view', 'profile.manage'
+  ],
+  staff: [
+    'dashboard.view', 'customers.view', 'services.view', 'services.manage',
+    'technicians.view', 'operations.view', 'operations.manage', 'content.view',
+    'notifications.view', 'profile.view', 'profile.manage'
+  ]
+};
+
+const getUiPermissions = (role) => [...(UI_ROLE_PERMISSIONS[role] || [])];
+
 /**
  * Check if a role has the given permission.
  * @param {string} role - 'superadmin' | 'admin' | 'staff'
@@ -157,7 +183,7 @@ const requireAdminAuth = (req, res, next) => {
   const adminRaw = adminUsers.find(u => u.id === session.adminId);
   // Strip password from req.admin — never expose credentials to route handlers
   const { password: _, ...adminSafe } = adminRaw;
-  req.admin = adminSafe;
+  req.admin = { ...adminSafe, permissions: getUiPermissions(adminSafe.role) };
   next();
 };
 
@@ -198,6 +224,8 @@ module.exports = {
   requirePermission,
   hasPermission,
   ROLE_PERMISSIONS,
+  UI_ROLE_PERMISSIONS,
+  getUiPermissions,
   parseCookies,
   isProduction,
   isDevFeatureEnabled,

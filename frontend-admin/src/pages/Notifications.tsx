@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Bell, CheckCheck, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import api from '@/services/api';
 
 type NotificationItem = {
   id: string;
@@ -11,8 +15,6 @@ type NotificationItem = {
   createdAt: string;
 };
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
 const severityClasses: Record<NotificationItem['severity'], string> = {
   INFO: 'border-sky-200 bg-sky-50 text-sky-700',
   SUCCESS: 'border-emerald-200 bg-emerald-50 text-emerald-700',
@@ -20,99 +22,39 @@ const severityClasses: Record<NotificationItem['severity'], string> = {
   CRITICAL: 'border-rose-200 bg-rose-50 text-rose-700',
 };
 
+function unwrapNotifications(payload: unknown): NotificationItem[] {
+  const root = payload as { data?: unknown };
+  const nested = root?.data as { data?: unknown } | undefined;
+  const records = Array.isArray(root?.data) ? root.data : nested?.data;
+  return Array.isArray(records) ? records as NotificationItem[] : [];
+}
+
 export default function Notifications() {
-  const [items, setItems] = useState<NotificationItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_BASE}/admin/notifications?limit=60&unreadOnly=${unreadOnly}`, {
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Không thể tải trung tâm thông báo.');
-      const payload = await response.json();
-      const records = payload?.data ?? payload;
-      setItems(Array.isArray(records) ? records : []);
-      setError('');
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Đã xảy ra lỗi.');
-    } finally {
-      setLoading(false);
-    }
-  }, [unreadOnly]);
-
-  useEffect(() => {
-    const initTimer = setTimeout(() => void load(), 0);
-    const timer = window.setInterval(() => void load(), 30_000);
-    return () => {
-      clearTimeout(initTimer);
-      window.clearInterval(timer);
-    };
-  }, [load]);
-
-  const unreadCount = useMemo(() => items.filter((item) => !item.isRead).length, [items]);
-
-  const markRead = async (id: string) => {
-    await fetch(`${API_BASE}/admin/notifications/${id}/read`, {
-      method: 'PATCH',
-      credentials: 'include',
-      headers: { 'content-type': 'application/json' },
-      body: '{}',
-    });
-    setItems((current) => current.map((item) => (String(item.id) === String(id) ? { ...item, isRead: true } : item)));
-  };
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: ['admin-notifications', unreadOnly],
+    queryFn: async () => unwrapNotifications((await api.get('/admin/notifications', { params: { limit: 60, unreadOnly } })).data),
+    refetchInterval: 30_000,
+  });
+  const markRead = useMutation({
+    mutationFn: async (id: string) => api.patch(`/admin/notifications/${encodeURIComponent(id)}/read`, {}),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-notifications'] }),
+  });
+  const items = query.data ?? [];
+  const unreadCount = items.filter((item) => !item.isRead).length;
 
   return (
-    <section className="space-y-6">
-      <header className="overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-7 text-white shadow-xl">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-300">Operations intelligence</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight">Trung tâm thông báo</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Theo dõi yêu cầu mới, cảnh báo SLA, trạng thái gửi email và các sự kiện quan trọng của đội vận hành.</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur">
-            <div className="text-xs uppercase tracking-wider text-slate-300">Chưa đọc</div>
-            <div className="mt-1 text-3xl font-bold">{unreadCount}</div>
-          </div>
-        </div>
+    <section className="space-y-6 pb-10">
+      <header className="relative overflow-hidden rounded-[2rem] border border-slate-800 bg-gradient-to-br from-slate-950 via-blue-950 to-cyan-900 p-7 text-white shadow-xl">
+        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-cyan-300/15 blur-3xl" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-300">Operations intelligence</p><h1 className="mt-2 flex items-center gap-3 text-3xl font-black tracking-tight"><Bell className="h-7 w-7" />Trung tâm thông báo</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Theo dõi yêu cầu mới, cảnh báo SLA, trạng thái gửi thông báo và sự kiện quan trọng của đội vận hành.</p></div><div className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur"><div className="text-xs uppercase tracking-wider text-slate-300">Chưa đọc</div><div className="mt-1 text-3xl font-black">{unreadCount}</div></div></div>
       </header>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <label className="inline-flex items-center gap-3 text-sm font-medium text-slate-700">
-          <input type="checkbox" checked={unreadOnly} onChange={(event) => setUnreadOnly(event.target.checked)} className="h-4 w-4 rounded border-slate-300" />
-          Chỉ hiển thị chưa đọc
-        </label>
-        <button type="button" onClick={() => void load()} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Làm mới</button>
-      </div>
-
-      {loading ? <div className="rounded-2xl border border-slate-200 bg-white p-8 text-slate-500">Đang tải thông báo…</div> : null}
-      {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-700">{error}</div> : null}
-      {!loading && !error && items.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">Không có thông báo phù hợp.</div> : null}
-
-      <div className="grid gap-4">
-        {items.map((item) => (
-          <article key={String(item.id)} className={`rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${item.isRead ? 'border-slate-200 opacity-80' : 'border-blue-200 ring-1 ring-blue-100'}`}>
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold tracking-wide ${severityClasses[item.severity]}`}>{item.severity}</span>
-                  {!item.isRead ? <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white">MỚI</span> : null}
-                  <time className="text-xs text-slate-400">{new Date(item.createdAt).toLocaleString('vi-VN')}</time>
-                </div>
-                <h2 className="mt-3 text-base font-bold text-slate-900">{item.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{item.message}</p>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                {item.actionUrl ? <a href={item.actionUrl} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Xem chi tiết</a> : null}
-                {!item.isRead ? <button type="button" onClick={() => void markRead(String(item.id))} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Đánh dấu đã đọc</button> : null}
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><label className="inline-flex items-center gap-3 text-sm font-bold text-slate-700"><input type="checkbox" checked={unreadOnly} onChange={(event) => setUnreadOnly(event.target.checked)} className="h-4 w-4 rounded border-slate-300" />Chỉ hiển thị chưa đọc</label><button type="button" onClick={() => void query.refetch()} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><RefreshCw className="h-4 w-4" />Làm mới</button></div>
+      {query.isLoading && <div className="rounded-2xl border border-slate-200 bg-white p-8 text-slate-500" role="status">Đang tải thông báo…</div>}
+      {query.isError && <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-700" role="alert">Không thể tải trung tâm thông báo.</div>}
+      {!query.isLoading && !query.isError && items.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">Không có thông báo phù hợp.</div>}
+      <div className="grid gap-4">{items.map((item) => <article key={String(item.id)} className={`rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none ${item.isRead ? 'border-slate-200 opacity-80' : 'border-blue-200 ring-1 ring-blue-100'}`}><div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full border px-2.5 py-1 text-[11px] font-black tracking-wide ${severityClasses[item.severity]}`}>{item.severity}</span>{!item.isRead && <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-black text-white">MỚI</span>}<time className="text-xs text-slate-400">{new Date(item.createdAt).toLocaleString('vi-VN')}</time></div><h2 className="mt-3 text-base font-black text-slate-900">{item.title}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{item.message}</p></div><div className="flex shrink-0 gap-2">{item.actionUrl && <Link to={item.actionUrl} className="inline-flex min-h-10 items-center rounded-xl bg-slate-900 px-4 text-sm font-bold text-white hover:bg-slate-700">Xem chi tiết</Link>}{!item.isRead && <button type="button" onClick={() => markRead.mutate(String(item.id))} disabled={markRead.isPending} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"><CheckCheck className="h-4 w-4" />Đã đọc</button>}</div></div></article>)}</div>
     </section>
   );
 }
