@@ -1,0 +1,93 @@
+name: Phase 5-6 service platform
+
+on:
+  push:
+    branches: ['agent/phase-5-6-*']
+  pull_request:
+    paths:
+      - 'backend/prisma/**'
+      - 'backend/src/modules/service-requests/**'
+      - 'backend/src/modules/users/**'
+      - 'frontend-user/src/pages/ServiceBooking.tsx'
+      - 'scripts/phase5-database-drill.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  database-drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_ENV: test
+      HOST: 0.0.0.0
+      PORT: 3000
+      API_PREFIX: api/v1
+      DATABASE_URL: mysql://root:ci_password@127.0.0.1:3306/phase5_clean
+      JWT_ACCESS_SECRET: phase56_access_secret_more_than_thirty_two_characters
+      JWT_REFRESH_SECRET: phase56_refresh_secret_more_than_thirty_two_characters
+      AUDIT_LOG_HASH_SALT: phase56_audit_salt_more_than_thirty_two_characters
+      ADMIN_SEED_EMAIL: admin-phase15@example.test
+      ADMIN_SEED_PASSWORD: Phase15AdminFixture123
+      CORS_ORIGINS: http://localhost:5173,http://localhost:5174
+      COOKIE_SECURE: 'false'
+      ENABLE_DEV_ENDPOINTS: 'false'
+      ENABLE_DEMO_ACCOUNTS: 'false'
+      THROTTLE_LIMIT: 500
+      PHASE15_API_URL: http://127.0.0.1:3000/api/v1
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -pci_password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm --prefix backend ci
+      - name: Clean migration and verified backup/restore drill
+        env:
+          PHASE5_DRILL_CONFIRM: phase5_drill
+          MYSQL_PASSWORD: ci_password
+        run: bash scripts/phase5-database-drill.sh
+      - name: Seed and build the service platform
+        run: |
+          npm --prefix backend run prisma:seed
+          npm --prefix backend run build
+      - name: Start backend and wait for readiness
+        run: |
+          npm --prefix backend run start:prod > phase56-api.log 2>&1 &
+          echo $! > phase56-api.pid
+          for attempt in {1..60}; do
+            if curl -fsS http://127.0.0.1:3000/api/v1/health/ready >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat phase56-api.log
+          exit 1
+      - name: Critical booking, quote and completion E2E
+        run: node backend/test/phase15-critical-flows.integration.mjs 2>&1 | tee phase56-critical-e2e.log
+      - name: Upload drill evidence on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase5-database-drill-evidence
+          path: |
+            backend/prisma/migrations
+            phase56-api.log
+            phase56-critical-e2e.log
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Stop backend
+        if: always()
+        run: if [ -f phase56-api.pid ]; then kill "$(cat phase56-api.pid)" 2>/dev/null || true; fi

@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsInt,
+  IsISO8601,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -23,8 +24,40 @@ export class UpdateProfileDto {
   lastName: string;
 
   @IsString()
-  @Matches(/^(?:\+?84|0)(?:3|5|7|8|9)\d{8}$/, { message: 'Số điện thoại Việt Nam không hợp lệ' })
+  @Matches(/^(?:\+?84|0)(?:3|5|7|8|9)\d{8}$/, {
+    message: 'Số điện thoại Việt Nam không hợp lệ',
+  })
   phone: string;
+}
+
+export class CustomerRescheduleServiceRequestDto {
+  @IsInt()
+  @Min(1)
+  requestVersion: number;
+
+  @IsISO8601({ strict: true }, { message: 'Ngày mong muốn không hợp lệ' })
+  preferredDate: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(80)
+  preferredTimeSlot: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason: string;
+}
+
+export class CustomerCancelServiceRequestDto {
+  @IsInt()
+  @Min(1)
+  requestVersion: number;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason: string;
 }
 
 export class AddressDto {
@@ -39,7 +72,9 @@ export class AddressDto {
   fullName: string;
 
   @IsString()
-  @Matches(/^(?:\+?84|0)(?:3|5|7|8|9)\d{8}$/, { message: 'Số điện thoại không hợp lệ' })
+  @Matches(/^(?:\+?84|0)(?:3|5|7|8|9)\d{8}$/, {
+    message: 'Số điện thoại không hợp lệ',
+  })
   phone: string;
 
   @IsString()
@@ -93,7 +128,9 @@ export class ClaimServiceRequestDto {
   code: string;
 
   @IsString()
-  @Matches(/^(?:\+?84|0)(?:3|5|7|8|9)\d{8}$/, { message: 'Số điện thoại không hợp lệ' })
+  @Matches(/^(?:\+?84|0)(?:3|5|7|8|9)\d{8}$/, {
+    message: 'Số điện thoại không hợp lệ',
+  })
   phone: string;
 }
 

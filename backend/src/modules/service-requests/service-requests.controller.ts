@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
@@ -92,8 +93,7 @@ export class ServiceRequestsController {
           ? String(user?.userId ?? user?.sub)
           : undefined,
       actorName:
-        user?.email ??
-        (fallbackType === 'CUSTOMER' ? 'Khách hàng' : undefined),
+        user?.email ?? (fallbackType === 'CUSTOMER' ? 'Khách hàng' : undefined),
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     };
@@ -101,10 +101,15 @@ export class ServiceRequestsController {
 
   @Post('service-requests')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  create(@Body() dto: CreateServiceRequestDto, @Req() req: Request) {
+  create(
+    @Body() dto: CreateServiceRequestDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Req() req: Request,
+  ) {
     return this.serviceRequestsService.create(
       dto,
       this.actorFromRequest(req, 'CUSTOMER'),
+      idempotencyKey,
     );
   }
 
@@ -128,9 +133,7 @@ export class ServiceRequestsController {
     @Req() req: Request,
   ) {
     if (!dto.phone) {
-      throw new BadRequestException(
-        'Số điện thoại là bắt buộc khi tải ảnh',
-      );
+      throw new BadRequestException('Số điện thoại là bắt buộc khi tải ảnh');
     }
     return this.serviceRequestsService.uploadMedia(
       id.trim().toUpperCase(),

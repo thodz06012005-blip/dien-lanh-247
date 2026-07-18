@@ -46,7 +46,13 @@ router.get('/settings/public', (_req, res) => {
 });
 
 router.get('/service-categories', (_req, res) =>
-  respondSuccess(res, readDB().serviceCategories || []),
+  respondSuccess(res, (readDB().serviceCategories || []).map((category) => ({
+    ...category,
+    referencePriceMin: category.referencePriceMin || 150000,
+    referencePriceMax: category.referencePriceMax || 650000,
+    surveyFee: category.surveyFee || 100000,
+    pricingNote: category.pricingNote || 'Giá tham khảo; báo giá chính thức chỉ được chốt sau khi kỹ thuật viên kiểm tra.',
+  }))),
 );
 
 module.exports = router;

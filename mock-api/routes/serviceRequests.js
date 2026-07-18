@@ -1,4 +1,5 @@
 const express = require('express');
+const { createHash } = require('node:crypto');
 const router = express.Router();
 const { readDB, writeDB } = require('../utils/db');
 const { respondSuccess, respondCreated, respondError } = require('../utils/response');
@@ -67,6 +68,31 @@ const populateTechnician = (request, db) => {
 router.post('/service-requests', (req, res) => {
   const db = readDB();
   const body = req.body;
+  const idempotencyKey = String(req.get('Idempotency-Key') || '').trim();
+  if (idempotencyKey && (idempotencyKey.length < 8 || idempotencyKey.length > 200)) {
+    return respondError(res, 400, 'Idempotency-Key phải có từ 8 đến 200 ký tự', 'INVALID_IDEMPOTENCY_KEY');
+  }
+  if (body.pricingDisclosureAccepted !== true || body.pricingDisclosureVersion !== '2026-07-v1') {
+    return respondError(res, 400, 'Cần xác nhận thông tin giá tham khảo', 'PRICING_DISCLOSURE_REQUIRED');
+  }
+  const fingerprint = createHash('sha256').update(JSON.stringify(body)).digest('hex');
+  const keyHash = idempotencyKey ? createHash('sha256').update(idempotencyKey).digest('hex') : null;
+  const submission = (db.serviceRequestSubmissions || []).find(item => item.idempotencyKeyHash === keyHash);
+  if (submission) {
+    if (submission.requestFingerprintHash !== fingerprint) {
+      return respondError(res, 409, 'Khóa gửi lại đã được dùng cho nội dung khác', 'IDEMPOTENCY_CONFLICT');
+    }
+    const existing = (db.serviceRequests || []).find(item => item.id === submission.requestId);
+    return respondSuccess(res, {
+      id: existing.id,
+      code: existing.id,
+      status: 'NEW',
+      confirmationSent: true,
+      preferredDate: existing.preferredDate,
+      preferredTimeSlot: existing.preferredTimeSlot,
+      replayed: true,
+    }, 'Yêu cầu đã được tiếp nhận trước đó; không tạo bản trùng.');
+  }
 
   // 1. Required fields validation
   const requiredFields = [
@@ -104,8 +130,8 @@ router.post('/service-requests', (req, res) => {
 
   // 3. Validate serviceCategoryId exists in db.serviceCategories
   const categories = db.serviceCategories || [];
-  const categoryExists = categories.some(cat => cat.id === serviceCategoryId);
-  if (!categoryExists) {
+  const category = categories.find(cat => cat.id === serviceCategoryId);
+  if (!category) {
     return respondError(res, 400, 'Danh mục dịch vụ không tồn tại', 'INVALID_SERVICE_CATEGORY');
   }
 
@@ -148,6 +174,14 @@ router.post('/service-requests', (req, res) => {
     preferredTimeSlot,
     note: body.note || '',
     status: 'pending',
+    workflowStatus: 'NEW',
+    requestVersion: 1,
+    customerEmail: String(body.customerEmail || '').trim().toLowerCase(),
+    pricingDisclosureVersion: body.pricingDisclosureVersion,
+    pricingDisclosureAcceptedAt: now,
+    referencePriceMinSnapshot: category.referencePriceMin || 150000,
+    referencePriceMaxSnapshot: category.referencePriceMax || 650000,
+    surveyFeeSnapshot: category.surveyFee || 100000,
     assignedTechnicianId: null,
     priority,
     estimatedPrice: 0,
@@ -167,9 +201,26 @@ router.post('/service-requests', (req, res) => {
 
   if (!db.serviceRequests) db.serviceRequests = [];
   db.serviceRequests.unshift(newRequest);
+  if (keyHash) {
+    if (!db.serviceRequestSubmissions) db.serviceRequestSubmissions = [];
+    db.serviceRequestSubmissions.push({
+      idempotencyKeyHash: keyHash,
+      requestFingerprintHash: fingerprint,
+      requestId,
+      createdAt: now,
+    });
+  }
   writeDB(db);
 
-  return respondCreated(res, newRequest, 'Đặt lịch dịch vụ thành công');
+  return respondCreated(res, {
+    id: requestId,
+    code: requestId,
+    status: 'NEW',
+    confirmationSent: true,
+    preferredDate,
+    preferredTimeSlot,
+    replayed: false,
+  }, 'Yêu cầu đã được tiếp nhận');
 });
 
 // GET /service-requests/:id (Customer views their service request)
@@ -297,7 +348,8 @@ router.patch('/admin/service-requests/:id/status', requirePermission('serviceReq
   const errors = [];
   validateRequiredString(req.params.id, 'id', errors, 1, 50);
   
-  const { status, finalPrice, note } = req.body;
+  const { status, finalPrice, note, requestVersion } = req.body;
+  validateInteger(requestVersion, 'requestVersion', errors, 1);
   if (status !== undefined) {
     validateEnum(status, VALID_SERVICE_STATUSES, 'status', errors);
   }
@@ -318,6 +370,9 @@ router.patch('/admin/service-requests/:id/status', requirePermission('serviceReq
   const request = (db.serviceRequests || []).find(r => r.id === id);
   if (!request) {
     return respondError(res, 404, 'Không tìm thấy yêu cầu dịch vụ', 'SERVICE_REQUEST_NOT_FOUND');
+  }
+  if (Number(request.requestVersion || 1) !== Number(requestVersion)) {
+    return respondError(res, 409, 'Yêu cầu đã thay đổi. Vui lòng tải lại.', 'REQUEST_VERSION_CONFLICT');
   }
 
   const oldStatus = request.status;
@@ -362,6 +417,7 @@ router.patch('/admin/service-requests/:id/status', requirePermission('serviceReq
     }
 
     request.status = status;
+    request.requestVersion = Number(request.requestVersion || 1) + 1;
     
     const now = new Date().toISOString();
     const logNote = note || `Cập nhật trạng thái thành ${status}`;

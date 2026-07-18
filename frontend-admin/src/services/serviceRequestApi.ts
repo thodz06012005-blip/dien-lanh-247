@@ -31,6 +31,7 @@ export async function getServiceRequest(id: string) {
 export async function updateServiceRequestStatus(
   id: string,
   payload: {
+    requestVersion: number;
     status: ServiceRequestStatus;
     note?: string;
     finalPrice?: number;
@@ -42,8 +43,8 @@ export async function updateServiceRequestStatus(
   return response.data as { success: true; data: ServiceRequest };
 }
 
-export async function assignServiceRequestTechnician(id: string, technicianId: string) {
-  const response = await api.patch(`/admin/service-requests/${encodeURIComponent(id)}/assign-technician`, { technicianId });
+export async function assignServiceRequestTechnician(id: string, technicianId: string, requestVersion: number) {
+  const response = await api.patch(`/admin/service-requests/${encodeURIComponent(id)}/assign-technician`, { technicianId, requestVersion });
   return response.data as { success: true; data: ServiceRequest };
 }
 

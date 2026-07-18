@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 
 const baseUrl = process.env.PHASE15_API_URL || 'http://127.0.0.1:3000/api/v1';
 const adminEmail = process.env.ADMIN_SEED_EMAIL || 'admin-phase15@example.test';
-const adminPassword = process.env.ADMIN_SEED_PASSWORD || 'Phase15AdminFixture123';
+const adminPassword =
+  process.env.ADMIN_SEED_PASSWORD || 'Phase15AdminFixture123';
 
 class CookieJar {
   constructor() {
@@ -35,8 +36,11 @@ class CookieJar {
   }
 }
 
-async function api(path, { method = 'GET', body, jar } = {}) {
-  const headers = { Accept: 'application/json' };
+async function api(
+  path,
+  { method = 'GET', body, jar, headers: extraHeaders = {} } = {},
+) {
+  const headers = { Accept: 'application/json', ...extraHeaders };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (jar?.header()) headers.Cookie = jar.header();
 
@@ -89,29 +93,55 @@ assert.equal(categories.status, 200);
 const categoryList = Array.isArray(categories.json?.data)
   ? categories.json.data
   : categories.json?.data?.data;
-const category = categoryList?.find((item) => item.id === 'sua-dieu-hoa') || categoryList?.[0];
+const category =
+  categoryList?.find((item) => item.id === 'sua-dieu-hoa') || categoryList?.[0];
 assert.ok(category?.id, 'service category seed is required');
 
+const bookingIdempotencyKey = `phase15-${unique}`;
+const bookingPayload = {
+  customerName: 'Khách hàng nghiệm thu Phase 15',
+  customerPhone,
+  customerEmail,
+  customerAddress: '12 Trần Thái Tông',
+  district: 'Quận Cầu Giấy',
+  serviceCategoryId: category.id,
+  applianceType: 'Điều hòa treo tường',
+  issueDescription:
+    'Điều hòa không lạnh, cần kiểm tra và báo giá trước khi sửa.',
+  preferredDate: futureDate(),
+  preferredTimeSlot: '08:00 - 10:00',
+  priority: 'medium',
+  note: 'E2E production acceptance flow',
+  pricingDisclosureAccepted: true,
+  pricingDisclosureVersion: '2026-07-v1',
+};
 const createRequest = await api('/service-requests', {
   method: 'POST',
-  body: {
-    customerName: 'Khách hàng nghiệm thu Phase 15',
-    customerPhone,
-    customerEmail,
-    customerAddress: '12 Trần Thái Tông',
-    district: 'Quận Cầu Giấy',
-    serviceCategoryId: category.id,
-    applianceType: 'Điều hòa treo tường',
-    issueDescription: 'Điều hòa không lạnh, cần kiểm tra và báo giá trước khi sửa.',
-    preferredDate: futureDate(),
-    preferredTimeSlot: '08:00 - 10:00',
-    priority: 'medium',
-    note: 'E2E production acceptance flow',
-  },
+  headers: { 'Idempotency-Key': bookingIdempotencyKey },
+  body: bookingPayload,
 });
 assert.equal(createRequest.status, 201);
 const requestId = createRequest.json?.data?.code;
 assert.match(requestId, /^DL247-/);
+
+const replayedRequest = await api('/service-requests', {
+  method: 'POST',
+  headers: { 'Idempotency-Key': bookingIdempotencyKey },
+  body: bookingPayload,
+});
+assert.equal(replayedRequest.status, 201);
+assert.equal(replayedRequest.json?.data?.code, requestId);
+assert.equal(replayedRequest.json?.data?.replayed, true);
+
+const conflictingReplay = await api('/service-requests', {
+  method: 'POST',
+  headers: { 'Idempotency-Key': bookingIdempotencyKey },
+  body: {
+    ...bookingPayload,
+    note: 'Payload khác không được dùng lại cùng khóa',
+  },
+});
+assert.equal(conflictingReplay.status, 409);
 
 const customerJar = new CookieJar();
 const register = await api('/auth/register', {
@@ -128,8 +158,55 @@ const register = await api('/auth/register', {
 assert.equal(register.status, 201);
 assert.ok(customerJar.header().includes('accessToken='));
 
-const forbiddenAdmin = await api('/admin/operations/overview', { jar: customerJar });
-assert.equal(forbiddenAdmin.status, 403, 'customer must not bypass backend RBAC');
+const claimed = await api('/account/service-requests/claim', {
+  method: 'POST',
+  jar: customerJar,
+  body: { code: requestId, phone: customerPhone },
+});
+assert.equal(claimed.status, 201);
+
+const customerDetailBefore = await api(
+  `/account/service-requests/${requestId}`,
+  {
+    jar: customerJar,
+  },
+);
+assert.equal(customerDetailBefore.status, 200);
+const customerVersion = customerDetailBefore.json?.data?.requestVersion;
+const customerReschedule = await api(
+  `/account/service-requests/${requestId}/reschedule`,
+  {
+    method: 'PATCH',
+    jar: customerJar,
+    body: {
+      requestVersion: customerVersion,
+      preferredDate: futureDate(3),
+      preferredTimeSlot: '10:00 - 12:00',
+      reason: 'Khách đổi lịch trong critical E2E',
+    },
+  },
+);
+assert.equal(customerReschedule.status, 200);
+assert.equal(customerReschedule.json?.data?.status, 'RESCHEDULED');
+
+const staleCancel = await api(`/account/service-requests/${requestId}/cancel`, {
+  method: 'POST',
+  jar: customerJar,
+  body: {
+    requestVersion: customerVersion,
+    reason: 'Kiểm tra optimistic locking',
+  },
+});
+assert.equal(staleCancel.status, 409);
+
+const forbiddenAdmin = await api('/admin/operations/overview', {
+  jar: customerJar,
+});
+assert.equal(
+  forbiddenAdmin.status,
+  403,
+  'customer must not bypass backend RBAC',
+);
 
 const adminJar = new CookieJar();
 const adminLogin = await api('/admin/auth/login', {
@@ -140,36 +217,51 @@ const adminLogin = await api('/admin/auth/login', {
 assert.equal(adminLogin.status, 200);
 assert.ok(adminJar.header().includes('adminAccessToken='));
 
-const adminDetail = await api(`/admin/service-requests/${requestId}`, { jar: adminJar });
+const adminDetail = await api(`/admin/service-requests/${requestId}`, {
+  jar: adminJar,
+});
 assert.equal(adminDetail.status, 200);
 assert.equal(adminDetail.json?.data?.id, requestId);
 
 const confirmed = await api(`/admin/service-requests/${requestId}/status`, {
   method: 'PATCH',
   jar: adminJar,
-  body: { status: 'CONFIRMED', note: 'Đã xác nhận yêu cầu qua E2E' },
+  body: {
+    requestVersion: adminDetail.json?.data?.requestVersion,
+    status: 'CONFIRMED',
+    note: 'Đã xác nhận yêu cầu qua E2E',
+  },
 });
 assert.equal(confirmed.status, 200);
 assert.equal(confirmed.json?.data?.workflowStatus, 'CONFIRMED');
 
 const schedule = futureWindow();
-const dispatched = await api(`/admin/operations/requests/${requestId}/dispatch`, {
-  method: 'POST',
-  jar: adminJar,
-  body: {
-    technicianId: 'TECH-001',
-    scheduledStart: schedule.start,
-    scheduledEnd: schedule.end,
-    reason: 'Phân công tự động trong nghiệm thu Phase 15',
+const dispatched = await api(
+  `/admin/operations/requests/${requestId}/dispatch`,
+  {
+    method: 'POST',
+    jar: adminJar,
+    body: {
+      technicianId: 'TECH-001',
+      scheduledStart: schedule.start,
+      scheduledEnd: schedule.end,
+      reason: 'Phân công tự động trong nghiệm thu Phase 15',
+    },
   },
-});
+);
 assert.equal(dispatched.status, 201);
 assert.equal(dispatched.json?.data?.request?.assignedTechnicianId, 'TECH-001');
 
 const started = await api(`/admin/service-requests/${requestId}/status`, {
   method: 'PATCH',
   jar: adminJar,
-  body: { status: 'IN_PROGRESS', note: 'Kỹ thuật viên bắt đầu xử lý' },
+  body: {
+    requestVersion: (
+      await api(`/admin/service-requests/${requestId}`, { jar: adminJar })
+    ).json?.data?.requestVersion,
+    status: 'IN_PROGRESS',
+    note: 'Kỹ thuật viên bắt đầu xử lý',
+  },
 });
 assert.equal(started.status, 200);
 assert.equal(started.json?.data?.workflowStatus, 'IN_PROGRESS');
@@ -210,33 +302,46 @@ assert.equal(quote.json?.data?.totalAmount, 550000);
 
 const accepted = await api('/operations/quotes/confirm', {
   method: 'POST',
-  body: { token: confirmationToken, decision: 'ACCEPT', note: 'Khách hàng đồng ý' },
+  body: {
+    token: confirmationToken,
+    decision: 'ACCEPT',
+    note: 'Khách hàng đồng ý',
+  },
 });
 assert.equal(accepted.status, 201);
 assert.equal(accepted.json?.data?.decision, 'ACCEPT');
 
-const completion = await api(`/admin/operations/requests/${requestId}/completion`, {
-  method: 'POST',
-  jar: adminJar,
-  body: {
-    diagnosis: 'Tụ khởi động suy giảm, hệ thống lạnh hoạt động không ổn định.',
-    workPerformed: 'Thay tụ, vệ sinh dàn lạnh và kiểm tra dòng vận hành.',
-    materialsUsed: [{ sku: 'CAP-P15', quantity: 1 }],
-    recommendations: 'Vệ sinh định kỳ mỗi 6 tháng.',
-    customerName: 'Khách hàng nghiệm thu Phase 15',
-    completedAt: new Date().toISOString(),
+const completion = await api(
+  `/admin/operations/requests/${requestId}/completion`,
+  {
+    method: 'POST',
+    jar: adminJar,
+    body: {
+      diagnosis:
+        'Tụ khởi động suy giảm, hệ thống lạnh hoạt động không ổn định.',
+      workPerformed: 'Thay tụ, vệ sinh dàn lạnh và kiểm tra dòng vận hành.',
+      materialsUsed: [{ sku: 'CAP-P15', quantity: 1 }],
+      recommendations: 'Vệ sinh định kỳ mỗi 6 tháng.',
+      customerName: 'Khách hàng nghiệm thu Phase 15',
+      completedAt: new Date().toISOString(),
+    },
   },
-});
+);
 assert.equal(completion.status, 201);
 assert.equal(completion.json?.data?.status, 'COMPLETED');
 
-const workspace = await api(`/admin/operations/requests/${requestId}`, { jar: adminJar });
+const workspace = await api(`/admin/operations/requests/${requestId}`, {
+  jar: adminJar,
+});
 assert.equal(workspace.status, 200);
 assert.equal(workspace.json?.data?.request?.workflowStatus, 'COMPLETED');
 assert.ok(workspace.json?.data?.completion?.reportNumber);
 assert.equal(workspace.json?.data?.quotes?.[0]?.status, 'ACCEPTED');
 
-const logout = await api('/admin/auth/logout', { method: 'POST', jar: adminJar });
+const logout = await api('/admin/auth/logout', {
+  method: 'POST',
+  jar: adminJar,
+});
 assert.equal(logout.status, 200);
 const afterLogout = await api('/admin/operations/overview', { jar: adminJar });
 assert.equal(afterLogout.status, 401);

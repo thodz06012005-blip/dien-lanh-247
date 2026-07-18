@@ -167,6 +167,8 @@ async function runTests() {
       preferredDate: '2026-07-20',
       preferredTimeSlot: '10:00 - 12:00',
       priority: 'invalid-priority',
+      pricingDisclosureAccepted: true,
+      pricingDisclosureVersion: '2026-07-v1',
     },
     token,
   );
@@ -191,9 +193,15 @@ async function runTests() {
     issueDescription: 'Bảo trì',
     preferredDate: preferredDate.toISOString().slice(0, 10),
     preferredTimeSlot: '10:00 - 12:00',
+    pricingDisclosureAccepted: true,
+    pricingDisclosureVersion: '2026-07-v1',
   });
-  console.log('Status:', srRes.status, 'Saved district:', srRes.data?.data?.district);
-  if (srRes.status !== 201 || srRes.data?.data?.district !== 'Quận Cầu Giấy') {
+  const createdId = srRes.data?.data?.id;
+  const savedRequest = createdId
+    ? await request('GET', `/api/v1/service-requests/${createdId}?phone=0912345678`)
+    : null;
+  console.log('Status:', srRes.status, 'Saved district:', savedRequest?.data?.data?.district);
+  if (srRes.status !== 201 || savedRequest?.data?.data?.district !== 'Quận Cầu Giấy') {
     console.error('ERROR: Failed to save district correctly!');
     process.exit(1);
   }

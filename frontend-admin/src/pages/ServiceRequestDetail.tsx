@@ -127,6 +127,7 @@ export default function ServiceRequestDetail() {
 
   const statusMutation = useMutation({
     mutationFn: () => updateServiceRequestStatus(id, {
+      requestVersion: request?.requestVersion ?? 0,
       status: nextStatus as ServiceRequestStatus,
       note: statusNote.trim() || undefined,
       ...(nextStatus === 'COMPLETED' ? { finalPrice: Number(finalPrice) } : {}),
@@ -146,7 +147,7 @@ export default function ServiceRequestDetail() {
   });
 
   const assignMutation = useMutation({
-    mutationFn: () => assignServiceRequestTechnician(id, selectedTechnician),
+    mutationFn: () => assignServiceRequestTechnician(id, selectedTechnician, request?.requestVersion ?? 0),
     onSuccess: () => {
       refreshRequest();
       queryClient.invalidateQueries({ queryKey: ['admin-technicians'] });

@@ -54,6 +54,14 @@ function getFutureDate(daysFromToday = 7) {
   return formatLocalDate(date);
 }
 
+async function patchStatus(id, body, token) {
+  const current = await request('GET', `/api/v1/admin/service-requests/${id}`, null, token);
+  return request('PATCH', `/api/v1/admin/service-requests/${id}/status`, {
+    requestVersion: current.data?.data?.requestVersion || 1,
+    ...body,
+  }, token);
+}
+
 async function runTests() {
   console.log('=== Running Service Request Lifecycle & Technician Matching Tests ===');
 
@@ -94,7 +102,7 @@ async function runTests() {
 
   // 1. pending -> confirmed (Xác nhận nhanh)
   console.log('\n[Test 2] Transitioning pending -> confirmed...');
-  const res1 = await request('PATCH', `/api/v1/admin/service-requests/${sr2.id}/status`, { status: 'confirmed', note: 'Xác nhận nhanh' }, token);
+  const res1 = await patchStatus(sr2.id, { status: 'confirmed', note: 'Xác nhận nhanh' }, token);
   console.log('Status:', res1.status, 'New Status:', res1.data?.data?.status);
   if (res1.status !== 200 || res1.data?.data?.status !== 'confirmed') {
     console.error('ERROR: Transition pending -> confirmed failed!');
@@ -110,13 +118,13 @@ async function runTests() {
     process.exit(1);
   }
   console.log('Completing sr1...');
-  const compRes1 = await request('PATCH', `/api/v1/admin/service-requests/${sr1.id}/status`, { status: 'completed', finalPrice: 250000 }, token);
+  const compRes1 = await patchStatus(sr1.id, { status: 'completed', finalPrice: 250000 }, token);
   if (compRes1.status !== 200) {
     console.error('ERROR: Completing service request failed!', compRes1.data);
     process.exit(1);
   }
   console.log('Attempting completed -> pending (Should FAIL)...');
-  const failRes1 = await request('PATCH', `/api/v1/admin/service-requests/${sr1.id}/status`, { status: 'pending' }, token);
+  const failRes1 = await patchStatus(sr1.id, { status: 'pending' }, token);
   console.log('Status:', failRes1.status, 'Message:', failRes1.data?.message);
   if (failRes1.status !== 400) {
     console.error('ERROR: Allowed completed -> pending transition!');
@@ -126,13 +134,13 @@ async function runTests() {
 
   // 3. cancelled -> assigned (Should be BLOCKED)
   console.log('\n[Test 4] Cancelling sr2...');
-  const cancelRes = await request('PATCH', `/api/v1/admin/service-requests/${sr2.id}/status`, { status: 'cancelled' }, token);
+  const cancelRes = await patchStatus(sr2.id, { status: 'cancelled' }, token);
   if (cancelRes.status !== 200) {
     console.error('ERROR: Cancelling service request failed!');
     process.exit(1);
   }
   console.log('Attempting cancelled -> assigned (Should FAIL)...');
-  const failRes2 = await request('PATCH', `/api/v1/admin/service-requests/${sr2.id}/status`, { status: 'assigned' }, token);
+  const failRes2 = await patchStatus(sr2.id, { status: 'assigned' }, token);
   console.log('Status:', failRes2.status, 'Message:', failRes2.data?.message);
   if (failRes2.status !== 400) {
     console.error('ERROR: Allowed cancelled -> assigned transition!');
@@ -155,7 +163,7 @@ async function runTests() {
 
   // 5. Assign technician: mismatched area (Should be BLOCKED)
   console.log('\n[Test 6] Assigning tech1 to sr2 (mismatched area)...');
-  await request('PATCH', `/api/v1/admin/service-requests/${sr2.id}/status`, { status: 'confirmed' }, token);
+  await patchStatus(sr2.id, { status: 'confirmed' }, token);
   const failAssign2 = await request('PATCH', `/api/v1/admin/service-requests/${sr2.id}/assign-technician`, { technicianId: tech1.id }, token);
   console.log('Status:', failAssign2.status, 'Message:', failAssign2.data?.message);
   if (failAssign2.status !== 400 || !failAssign2.data?.message.includes('không hỗ trợ hoạt động tại khu vực')) {
@@ -184,7 +192,9 @@ async function runTests() {
     applianceType: 'Điều hòa',
     issueDescription: 'Vệ sinh máy',
     preferredDate: getFutureDate(7),
-    preferredTimeSlot: '10:00 - 12:00'
+    preferredTimeSlot: '10:00 - 12:00',
+    pricingDisclosureAccepted: true,
+    pricingDisclosureVersion: '2026-07-v1'
   });
 
   if (newSrRes.status !== 201 || !newSrRes.data?.data?.id) {
@@ -193,7 +203,7 @@ async function runTests() {
   }
 
   const sr3Id = newSrRes.data.data.id;
-  const confirmSr3 = await request('PATCH', `/api/v1/admin/service-requests/${sr3Id}/status`, { status: 'confirmed' }, token);
+  const confirmSr3 = await patchStatus(sr3Id, { status: 'confirmed' }, token);
   if (confirmSr3.status !== 200) {
     console.error('ERROR: Failed to confirm generated service request!', confirmSr3);
     process.exit(1);
@@ -211,7 +221,7 @@ async function runTests() {
   // 7. Complete and release logic
   console.log('\n[Test 8] Complete and release logic...');
   // Complete sr1
-  const releaseRes = await request('PATCH', `/api/v1/admin/service-requests/${sr1.id}/status`, { status: 'completed', finalPrice: 250000 }, token);
+  const releaseRes = await patchStatus(sr1.id, { status: 'completed', finalPrice: 250000 }, token);
   if (releaseRes.status !== 200) {
     console.error('ERROR: Failed to complete request and release technician!', releaseRes);
     process.exit(1);

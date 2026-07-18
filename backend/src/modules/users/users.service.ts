@@ -9,11 +9,14 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../core/database/prisma.service';
+import { MailService } from '../../integrations/mail/mail.service';
 import { AuthService } from '../auth/auth.service';
 import {
   AddressDto,
   ChangePasswordDto,
   ClaimServiceRequestDto,
+  CustomerCancelServiceRequestDto,
+  CustomerRescheduleServiceRequestDto,
   ServiceRequestReviewDto,
   UpdateProfileDto,
 } from './dto/account.dto';
@@ -57,6 +60,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
   ) {}
 
   private normalizePhone(phone?: string | null) {
@@ -74,7 +78,8 @@ export class UsersService {
       userId,
     );
     const user = rows[0];
-    if (!user || !Boolean(user.isActive)) throw new UnauthorizedException('Tài khoản không còn hoạt động');
+    if (!user || !Boolean(user.isActive))
+      throw new UnauthorizedException('Tài khoản không còn hoạt động');
     return user;
   }
 
@@ -107,11 +112,13 @@ export class UsersService {
       params.push(user.normalizedPhone);
     }
     if (!clauses.length) return 0;
-    return Number(await this.prisma.$executeRawUnsafe(
-      `UPDATE ServiceRequest SET customerUserId = ?
+    return Number(
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE ServiceRequest SET customerUserId = ?
        WHERE customerUserId IS NULL AND (${clauses.join(' OR ')})`,
-      ...params,
-    ));
+        ...params,
+      ),
+    );
   }
 
   async getOverview(userId: number) {
@@ -134,7 +141,10 @@ export class UsersService {
     ]);
     return {
       user: this.safeAccount(user),
-      defaultAddress: addresses.find((address) => Boolean(address.isDefault)) ?? addresses[0] ?? null,
+      defaultAddress:
+        addresses.find((address) => Boolean(address.isDefault)) ??
+        addresses[0] ??
+        null,
       stats: {
         services: Number(stats[0]?.serviceCount ?? 0),
         unreadNotifications: Number(unreadRows[0]?.total ?? 0),
@@ -151,7 +161,10 @@ export class UsersService {
       normalizedPhone,
       userId,
     );
-    if (duplicate.length) throw new ConflictException('Số điện thoại đã được sử dụng bởi tài khoản khác');
+    if (duplicate.length)
+      throw new ConflictException(
+        'Số điện thoại đã được sử dụng bởi tài khoản khác',
+      );
     const phoneChanged = current.normalizedPhone !== normalizedPhone;
     await this.prisma.$executeRawUnsafe(
       `UPDATE User
@@ -182,13 +195,16 @@ export class UsersService {
 
   async createAddress(userId: number, dto: AddressDto) {
     await this.getAccountRow(userId);
-    const countRows = await this.prisma.$queryRawUnsafe<Array<{ total: bigint }>>(
-      'SELECT COUNT(*) AS total FROM Address WHERE userId = ?',
-      userId,
-    );
+    const countRows = await this.prisma.$queryRawUnsafe<
+      Array<{ total: bigint }>
+    >('SELECT COUNT(*) AS total FROM Address WHERE userId = ?', userId);
     const makeDefault = dto.isDefault || Number(countRows[0]?.total ?? 0) === 0;
     const insertId = await this.prisma.$transaction(async (tx) => {
-      if (makeDefault) await tx.$executeRawUnsafe('UPDATE Address SET isDefault = 0 WHERE userId = ?', userId);
+      if (makeDefault)
+        await tx.$executeRawUnsafe(
+          'UPDATE Address SET isDefault = 0 WHERE userId = ?',
+          userId,
+        );
       await tx.$executeRawUnsafe(
         `INSERT INTO Address
           (userId, label, fullName, phone, province, district, ward, streetAddress, note,
@@ -205,7 +221,9 @@ export class UsersService {
         dto.note?.trim() || null,
         makeDefault ? 1 : 0,
       );
-      const rows = await tx.$queryRawUnsafe<Array<{ id: bigint }>>('SELECT LAST_INSERT_ID() AS id');
+      const rows = await tx.$queryRawUnsafe<Array<{ id: bigint }>>(
+        'SELECT LAST_INSERT_ID() AS id',
+      );
       return Number(rows[0]?.id ?? 0);
     });
     return this.getAddressOwned(userId, insertId);
@@ -226,7 +244,11 @@ export class UsersService {
   async updateAddress(userId: number, addressId: number, dto: AddressDto) {
     await this.getAddressOwned(userId, addressId);
     await this.prisma.$transaction(async (tx) => {
-      if (dto.isDefault) await tx.$executeRawUnsafe('UPDATE Address SET isDefault = 0 WHERE userId = ?', userId);
+      if (dto.isDefault)
+        await tx.$executeRawUnsafe(
+          'UPDATE Address SET isDefault = 0 WHERE userId = ?',
+          userId,
+        );
       await tx.$executeRawUnsafe(
         `UPDATE Address SET label = ?, fullName = ?, phone = ?, province = ?, district = ?, ward = ?,
                             streetAddress = ?, note = ?, isDefault = ?, updatedAt = NOW(3)
@@ -250,7 +272,11 @@ export class UsersService {
   async deleteAddress(userId: number, addressId: number) {
     const address = await this.getAddressOwned(userId, addressId);
     await this.prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe('DELETE FROM Address WHERE id = ? AND userId = ?', addressId, userId);
+      await tx.$executeRawUnsafe(
+        'DELETE FROM Address WHERE id = ? AND userId = ?',
+        addressId,
+        userId,
+      );
       if (Boolean(address.isDefault)) {
         await tx.$executeRawUnsafe(
           `UPDATE Address SET isDefault = 1
@@ -267,13 +293,19 @@ export class UsersService {
       'SELECT password FROM User WHERE id = ? AND isActive = 1 LIMIT 1',
       userId,
     );
-    if (!rows[0] || !(await bcrypt.compare(dto.currentPassword, rows[0].password))) {
+    if (
+      !rows[0] ||
+      !(await bcrypt.compare(dto.currentPassword, rows[0].password))
+    ) {
       throw new ForbiddenException('Mật khẩu hiện tại không đúng');
     }
     if (await bcrypt.compare(dto.newPassword, rows[0].password)) {
       throw new BadRequestException('Mật khẩu mới phải khác mật khẩu hiện tại');
     }
-    const rounds = Math.min(15, Math.max(8, Number(this.configService.get('BCRYPT_SALT_ROUNDS')) || 10));
+    const rounds = Math.min(
+      15,
+      Math.max(8, Number(this.configService.get('BCRYPT_SALT_ROUNDS')) || 10),
+    );
     const hash = await bcrypt.hash(dto.newPassword, rounds);
     await this.prisma.$executeRawUnsafe(
       'UPDATE User SET password = ?, passwordChangedAt = NOW(3) WHERE id = ?',
@@ -293,21 +325,39 @@ export class UsersService {
   async claimServiceRequest(userId: number, dto: ClaimServiceRequestDto) {
     const user = await this.getAccountRow(userId);
     const phone = this.normalizePhone(dto.phone);
-    const rows = await this.prisma.$queryRawUnsafe<Array<{ id: string; customerUserId: number | null; customerPhone: string }>>(
+    const rows = await this.prisma.$queryRawUnsafe<
+      Array<{
+        id: string;
+        customerUserId: number | null;
+        customerPhone: string;
+      }>
+    >(
       `SELECT id, customerUserId, customerPhone FROM ServiceRequest
        WHERE id = ? AND customerPhone = ? LIMIT 1`,
       dto.code.trim().toUpperCase(),
       phone,
     );
     const request = rows[0];
-    if (!request) throw new NotFoundException('Không tìm thấy yêu cầu với thông tin đã cung cấp');
+    if (!request)
+      throw new NotFoundException(
+        'Không tìm thấy yêu cầu với thông tin đã cung cấp',
+      );
     if (request.customerUserId && request.customerUserId !== userId) {
-      throw new ConflictException('Yêu cầu đã được liên kết với tài khoản khác');
+      throw new ConflictException(
+        'Yêu cầu đã được liên kết với tài khoản khác',
+      );
     }
     await this.prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe('UPDATE ServiceRequest SET customerUserId = ? WHERE id = ?', userId, request.id);
+      await tx.$executeRawUnsafe(
+        'UPDATE ServiceRequest SET customerUserId = ? WHERE id = ?',
+        userId,
+        request.id,
+      );
       if (user.normalizedPhone === phone) {
-        await tx.$executeRawUnsafe('UPDATE User SET phoneVerifiedAt = COALESCE(phoneVerifiedAt, NOW(3)) WHERE id = ?', userId);
+        await tx.$executeRawUnsafe(
+          'UPDATE User SET phoneVerifiedAt = COALESCE(phoneVerifiedAt, NOW(3)) WHERE id = ?',
+          userId,
+        );
       }
       await tx.$executeRawUnsafe(
         `INSERT INTO CustomerNotification (userId, type, title, body, data, createdAt)
@@ -339,11 +389,15 @@ export class UsersService {
   }
 
   async getServiceRequest(userId: number, requestId: string) {
-    const rows = await this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+    const rows = await this.prisma.$queryRawUnsafe<
+      Array<Record<string, unknown>>
+    >(
       `SELECT sr.id, sr.customerName, sr.customerPhone, sr.customerEmail, sr.customerAddress,
               sr.district, sr.workflowStatus AS status, sr.priority, sr.applianceType,
               sr.issueDescription, sr.preferredDate, sr.preferredTimeSlot, sr.note,
-              sr.estimatedPrice, sr.finalPrice, sr.paymentStatus, sr.createdAt, sr.updatedAt,
+              sr.estimatedPrice, sr.finalPrice, sr.paymentStatus, sr.requestVersion,
+              sr.referencePriceMinSnapshot, sr.referencePriceMaxSnapshot, sr.surveyFeeSnapshot,
+              sr.pricingDisclosureVersion, sr.createdAt, sr.updatedAt,
               category.id AS serviceCategoryId, category.name AS serviceCategoryName,
               technician.name AS technicianName, technician.avatar AS technicianAvatar
        FROM ServiceRequest sr
@@ -354,7 +408,15 @@ export class UsersService {
       userId,
     );
     if (!rows[0]) throw new NotFoundException('Không tìm thấy yêu cầu dịch vụ');
-    const [timeline, media, reviews] = await Promise.all([
+    const [
+      timeline,
+      media,
+      reviews,
+      quotes,
+      completion,
+      warranties,
+      scheduleChanges,
+    ] = await Promise.all([
       this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
         `SELECT id, fromStatus, toStatus, note, actorType, actorName, createdAt
          FROM ServiceRequestStatusEvent WHERE requestId = ? ORDER BY createdAt ASC, id ASC`,
@@ -371,19 +433,256 @@ export class UsersService {
         requestId.trim().toUpperCase(),
         userId,
       ),
+      this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+        `SELECT id, quoteNumber, version, status, laborSubtotal, materialSubtotal,
+                discountAmount, taxAmount, subtotal, totalAmount, notes, validUntil,
+                sentAt, customerConfirmedAt, customerRejectedAt, createdAt, updatedAt
+         FROM ServiceQuote WHERE requestId = ?
+         ORDER BY version DESC, id DESC`,
+        requestId.trim().toUpperCase(),
+      ),
+      this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+        `SELECT reportNumber, diagnosis, workPerformed, materialsUsed, recommendations,
+                customerName, customerConfirmedAt, completedAt, createdAt
+         FROM CompletionReport WHERE requestId = ? LIMIT 1`,
+        requestId.trim().toUpperCase(),
+      ),
+      this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+        `SELECT warrantyNumber, status, coverage, exclusions, startsAt, endsAt, closedAt, createdAt
+         FROM WarrantyRecord WHERE requestId = ? ORDER BY createdAt DESC`,
+        requestId.trim().toUpperCase(),
+      ),
+      this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+        `SELECT id, fromPreferredDate, fromPreferredTimeSlot, toPreferredDate,
+                toPreferredTimeSlot, reason, actorType, fromRequestVersion,
+                toRequestVersion, createdAt
+         FROM ServiceRequestScheduleChange WHERE requestId = ? ORDER BY createdAt DESC, id DESC`,
+        requestId.trim().toUpperCase(),
+      ),
     ]);
-    return { ...rows[0], timeline, media, review: reviews[0] ?? null };
+    return {
+      ...rows[0],
+      timeline,
+      media,
+      review: reviews[0] ?? null,
+      quotes,
+      completion: completion[0] ?? null,
+      warranties,
+      scheduleChanges,
+      selfServiceActions: {
+        canReschedule: ['NEW', 'CONFIRMED', 'RESCHEDULED'].includes(
+          String(rows[0].status),
+        ),
+        canCancel: ['NEW', 'CONFIRMED', 'RESCHEDULED'].includes(
+          String(rows[0].status),
+        ),
+      },
+    };
   }
 
-  async reviewServiceRequest(userId: number, requestId: string, dto: ServiceRequestReviewDto) {
-    const owned = await this.prisma.$queryRawUnsafe<Array<{ id: string; workflowStatus: string }>>(
+  async rescheduleServiceRequest(
+    userId: number,
+    requestId: string,
+    dto: CustomerRescheduleServiceRequestDto,
+  ) {
+    const normalizedId = requestId.trim().toUpperCase();
+    const requestedDate = new Date(`${dto.preferredDate}T00:00:00+07:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (Number.isNaN(requestedDate.getTime()) || requestedDate < today) {
+      throw new BadRequestException(
+        'Ngày mong muốn mới phải từ hôm nay trở đi',
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRawUnsafe<
+        Array<{
+          workflowStatus: string;
+          requestVersion: number;
+          preferredDate: string;
+          preferredTimeSlot: string;
+        }>
+      >(
+        `SELECT workflowStatus, requestVersion, preferredDate, preferredTimeSlot
+         FROM ServiceRequest WHERE id = ? AND customerUserId = ? FOR UPDATE`,
+        normalizedId,
+        userId,
+      );
+      const current = rows[0];
+      if (!current)
+        throw new NotFoundException('Không tìm thấy yêu cầu dịch vụ');
+      if (
+        !['NEW', 'CONFIRMED', 'RESCHEDULED'].includes(current.workflowStatus)
+      ) {
+        throw new BadRequestException(
+          'Yêu cầu đã được điều phối hoặc xử lý nên không thể tự đổi lịch',
+        );
+      }
+      if (current.requestVersion !== dto.requestVersion) {
+        throw new ConflictException(
+          `Yêu cầu đã thay đổi (phiên bản hiện tại ${current.requestVersion}). Vui lòng tải lại.`,
+        );
+      }
+
+      await tx.$executeRawUnsafe(
+        `UPDATE ServiceRequest
+         SET workflowStatus = 'RESCHEDULED', status = 'confirmed',
+             preferredDate = ?, preferredTimeSlot = ?,
+             scheduledAt = STR_TO_DATE(CONCAT(?, ' ', SUBSTRING_INDEX(?, ' ', 1)), '%Y-%m-%d %H:%i'),
+             requestVersion = requestVersion + 1, lastStatusChangedAt = NOW(3)
+         WHERE id = ? AND customerUserId = ? AND requestVersion = ?`,
+        dto.preferredDate,
+        dto.preferredTimeSlot.trim(),
+        dto.preferredDate,
+        dto.preferredTimeSlot.trim(),
+        normalizedId,
+        userId,
+        dto.requestVersion,
+      );
+      await tx.$executeRawUnsafe(
+        `INSERT INTO ServiceRequestScheduleChange
+           (requestId, fromPreferredDate, fromPreferredTimeSlot, toPreferredDate,
+            toPreferredTimeSlot, reason, actorType, actorId, fromRequestVersion,
+            toRequestVersion, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, 'CUSTOMER', ?, ?, ?, NOW(3))`,
+        normalizedId,
+        current.preferredDate,
+        current.preferredTimeSlot,
+        dto.preferredDate,
+        dto.preferredTimeSlot.trim(),
+        dto.reason.trim(),
+        String(userId),
+        current.requestVersion,
+        current.requestVersion + 1,
+      );
+      await tx.$executeRawUnsafe(
+        `INSERT INTO ServiceRequestStatusEvent
+           (requestId, fromStatus, toStatus, note, actorType, actorId, actorName, metadata, createdAt)
+         VALUES (?, ?, 'RESCHEDULED', ?, 'CUSTOMER', ?, 'Khách hàng', ?, NOW(3))`,
+        normalizedId,
+        current.workflowStatus,
+        dto.reason.trim(),
+        String(userId),
+        JSON.stringify({
+          preferredDate: dto.preferredDate,
+          preferredTimeSlot: dto.preferredTimeSlot,
+        }),
+      );
+      await tx.$executeRawUnsafe(
+        `INSERT INTO CustomerNotification (userId, type, title, body, data, createdAt)
+         VALUES (?, 'SERVICE_REQUEST_RESCHEDULED', 'Đã nhận yêu cầu đổi lịch', ?, ?, NOW(3))`,
+        userId,
+        `Lịch ${dto.preferredDate} · ${dto.preferredTimeSlot} đang chờ điều phối viên xác nhận.`,
+        JSON.stringify({ requestId: normalizedId }),
+      );
+    });
+    const result = await this.getServiceRequest(userId, normalizedId);
+    const emailValue = (result as Record<string, unknown>).customerEmail;
+    const email = typeof emailValue === 'string' ? emailValue : null;
+    if (email) {
+      void this.mailService
+        .sendServiceRequestMilestone(email, {
+          code: normalizedId,
+          title: 'Đã nhận yêu cầu đổi lịch',
+          detail: `Lịch mong muốn mới: ${dto.preferredDate} · ${dto.preferredTimeSlot}. Lịch chỉ được chốt sau khi điều phối viên xác nhận.`,
+        })
+        .catch(() => undefined);
+    }
+    return result;
+  }
+
+  async cancelServiceRequest(
+    userId: number,
+    requestId: string,
+    dto: CustomerCancelServiceRequestDto,
+  ) {
+    const normalizedId = requestId.trim().toUpperCase();
+    await this.prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRawUnsafe<
+        Array<{ workflowStatus: string; requestVersion: number }>
+      >(
+        `SELECT workflowStatus, requestVersion FROM ServiceRequest
+         WHERE id = ? AND customerUserId = ? FOR UPDATE`,
+        normalizedId,
+        userId,
+      );
+      const current = rows[0];
+      if (!current)
+        throw new NotFoundException('Không tìm thấy yêu cầu dịch vụ');
+      if (
+        !['NEW', 'CONFIRMED', 'RESCHEDULED'].includes(current.workflowStatus)
+      ) {
+        throw new BadRequestException(
+          'Yêu cầu đã được điều phối hoặc xử lý; vui lòng liên hệ hotline để hủy',
+        );
+      }
+      if (current.requestVersion !== dto.requestVersion) {
+        throw new ConflictException(
+          `Yêu cầu đã thay đổi (phiên bản hiện tại ${current.requestVersion}). Vui lòng tải lại.`,
+        );
+      }
+      await tx.$executeRawUnsafe(
+        `UPDATE ServiceRequest
+         SET workflowStatus = 'CANCELLED', status = 'cancelled',
+             requestVersion = requestVersion + 1, lastStatusChangedAt = NOW(3)
+         WHERE id = ? AND customerUserId = ? AND requestVersion = ?`,
+        normalizedId,
+        userId,
+        dto.requestVersion,
+      );
+      await tx.$executeRawUnsafe(
+        `INSERT INTO ServiceRequestStatusEvent
+           (requestId, fromStatus, toStatus, note, actorType, actorId, actorName, createdAt)
+         VALUES (?, ?, 'CANCELLED', ?, 'CUSTOMER', ?, 'Khách hàng', NOW(3))`,
+        normalizedId,
+        current.workflowStatus,
+        dto.reason.trim(),
+        String(userId),
+      );
+      await tx.$executeRawUnsafe(
+        `INSERT INTO CustomerNotification (userId, type, title, body, data, createdAt)
+         VALUES (?, 'SERVICE_REQUEST_CANCELLED', 'Yêu cầu đã hủy', ?, ?, NOW(3))`,
+        userId,
+        `Yêu cầu ${normalizedId} đã được hủy theo đề nghị của bạn.`,
+        JSON.stringify({ requestId: normalizedId }),
+      );
+    });
+    const result = await this.getServiceRequest(userId, normalizedId);
+    const emailValue = (result as Record<string, unknown>).customerEmail;
+    const email = typeof emailValue === 'string' ? emailValue : null;
+    if (email) {
+      void this.mailService
+        .sendServiceRequestMilestone(email, {
+          code: normalizedId,
+          title: 'Yêu cầu dịch vụ đã hủy',
+          detail: `Lý do: ${dto.reason.trim()}`,
+        })
+        .catch(() => undefined);
+    }
+    return result;
+  }
+
+  async reviewServiceRequest(
+    userId: number,
+    requestId: string,
+    dto: ServiceRequestReviewDto,
+  ) {
+    const owned = await this.prisma.$queryRawUnsafe<
+      Array<{ id: string; workflowStatus: string }>
+    >(
       'SELECT id, workflowStatus FROM ServiceRequest WHERE id = ? AND customerUserId = ? LIMIT 1',
       requestId.trim().toUpperCase(),
       userId,
     );
-    if (!owned[0]) throw new NotFoundException('Không tìm thấy yêu cầu dịch vụ');
-    if (!['COMPLETED', 'WARRANTY', 'CLOSED'].includes(owned[0].workflowStatus)) {
-      throw new BadRequestException('Chỉ có thể đánh giá yêu cầu đã hoàn thành');
+    if (!owned[0])
+      throw new NotFoundException('Không tìm thấy yêu cầu dịch vụ');
+    if (
+      !['COMPLETED', 'WARRANTY', 'CLOSED'].includes(owned[0].workflowStatus)
+    ) {
+      throw new BadRequestException(
+        'Chỉ có thể đánh giá yêu cầu đã hoàn thành',
+      );
     }
     await this.prisma.$executeRawUnsafe(
       `INSERT INTO ServiceRequestReview (requestId, userId, rating, comment, createdAt, updatedAt)
@@ -412,7 +711,8 @@ export class UsersService {
       id,
       userId,
     );
-    if (!Number(affected)) throw new NotFoundException('Không tìm thấy thông báo');
+    if (!Number(affected))
+      throw new NotFoundException('Không tìm thấy thông báo');
     return { read: true };
   }
 
@@ -426,13 +726,18 @@ export class UsersService {
 
   async listSessions(userId: number, currentSessionId: string) {
     await this.getAccountRow(userId);
-    const rows = await this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+    const rows = await this.prisma.$queryRawUnsafe<
+      Array<Record<string, unknown>>
+    >(
       `SELECT id, userAgent, createdAt, lastUsedAt, rotatedAt, expiresAt
        FROM AuthSession WHERE userId = ? AND revokedAt IS NULL AND expiresAt > NOW(3)
        ORDER BY createdAt DESC`,
       userId,
     );
-    return rows.map((row) => ({ ...row, current: row.id === currentSessionId }));
+    return rows.map((row) => ({
+      ...row,
+      current: row.id === currentSessionId,
+    }));
   }
 
   async revokeSession(userId: number, sessionId: string) {
@@ -442,7 +747,8 @@ export class UsersService {
       sessionId,
       userId,
     );
-    if (!Number(affected)) throw new NotFoundException('Không tìm thấy phiên đăng nhập');
+    if (!Number(affected))
+      throw new NotFoundException('Không tìm thấy phiên đăng nhập');
     return { revoked: true };
   }
 }

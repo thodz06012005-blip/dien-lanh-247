@@ -24,6 +24,10 @@ export interface ServiceCategory {
   slug: string;
   icon?: string;
   description?: string;
+  referencePriceMin?: number | string | null;
+  referencePriceMax?: number | string | null;
+  surveyFee?: number | string;
+  pricingNote?: string | null;
 }
 
 export interface StatusHistoryEntry {

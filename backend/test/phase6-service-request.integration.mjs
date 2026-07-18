@@ -9,7 +9,9 @@ async function request(path, options = {}) {
     ...options,
     headers: {
       Accept: 'application/json',
-      ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(options.body instanceof FormData
+        ? {}
+        : { 'Content-Type': 'application/json' }),
       ...(options.headers || {}),
     },
   });
@@ -28,13 +30,16 @@ function dataOf(payload) {
 }
 
 function messageOf(payload) {
-  return payload?.message || payload?.data?.message || payload?.error?.message || '';
+  return (
+    payload?.message || payload?.data?.message || payload?.error?.message || ''
+  );
 }
 
 function extractCookie(response) {
-  const values = typeof response.headers.getSetCookie === 'function'
-    ? response.headers.getSetCookie()
-    : [response.headers.get('set-cookie') || ''];
+  const values =
+    typeof response.headers.getSetCookie === 'function'
+      ? response.headers.getSetCookie()
+      : [response.headers.get('set-cookie') || ''];
   const access = values.join(',').match(/accessToken=([^;]+)/);
   assert.ok(access, 'Admin login must set the HttpOnly accessToken cookie');
   return `accessToken=${access[1]}`;
@@ -48,16 +53,20 @@ const createPayload = {
   district: 'Quận Cầu Giấy',
   applianceType: 'Điều hòa Daikin Inverter 12000 BTU',
   serviceCategoryId: 'sua-dieu-hoa',
-  issueDescription: 'Điều hòa không làm lạnh và có tiếng kêu bất thường khi vận hành.',
+  issueDescription:
+    'Điều hòa không làm lạnh và có tiếng kêu bất thường khi vận hành.',
   priority: 'high',
   preferredDate: '2027-01-15',
   preferredTimeSlot: '08:00 - 10:00',
   note: 'Gọi trước khi đến 30 phút.',
+  pricingDisclosureAccepted: true,
+  pricingDisclosureVersion: '2026-07-v1',
 };
 
 console.log('1. Creating a public service request...');
 const created = await request('/service-requests', {
   method: 'POST',
+  headers: { 'Idempotency-Key': 'phase6-critical-flow-idempotency-key' },
   body: JSON.stringify(createPayload),
 });
 assert.equal(created.response.status, 201, messageOf(created.payload));
@@ -78,7 +87,10 @@ assert.equal(lookupData.status, 'NEW');
 assert.notEqual(lookupData.customerPhone, createPayload.customerPhone);
 assert.notEqual(lookupData.customerEmail, createPayload.customerEmail);
 assert.equal('customerAddress' in lookupData, false);
-assert.equal(JSON.stringify(lookupData).includes(createPayload.customerAddress), false);
+assert.equal(
+  JSON.stringify(lookupData).includes(createPayload.customerAddress),
+  false,
+);
 
 console.log('3. Rejecting lookup with a wrong phone...');
 const wrongLookup = await request('/service-requests/lookup', {
@@ -95,39 +107,74 @@ const login = await request('/admin/auth/login', {
 assert.equal(login.response.status, 200, messageOf(login.payload));
 const cookie = extractCookie(login.response);
 
-const adminPatch = (status, extra = {}) => request(`/admin/service-requests/${encodeURIComponent(code)}/status`, {
-  method: 'PATCH',
-  headers: { Cookie: cookie },
-  body: JSON.stringify({ status, note: `Integration test -> ${status}`, ...extra }),
-});
+const adminPatch = async (status, extra = {}) => {
+  const current = await request(
+    `/admin/service-requests/${encodeURIComponent(code)}`,
+    {
+      headers: { Cookie: cookie },
+    },
+  );
+  return request(`/admin/service-requests/${encodeURIComponent(code)}/status`, {
+    method: 'PATCH',
+    headers: { Cookie: cookie },
+    body: JSON.stringify({
+      requestVersion: dataOf(current.payload).requestVersion,
+      status,
+      note: `Integration test -> ${status}`,
+      ...extra,
+    }),
+  });
+};
 
 console.log('5. Blocking an invalid NEW -> COMPLETED shortcut...');
-const invalidNewCompleted = await adminPatch('COMPLETED', { finalPrice: 450000 });
+const invalidNewCompleted = await adminPatch('COMPLETED', {
+  finalPrice: 450000,
+});
 assert.equal(invalidNewCompleted.response.status, 400);
 
 console.log('6. Running the valid workflow through completion...');
 assert.equal((await adminPatch('CONFIRMED')).response.status, 200);
 
-const assigned = await request(`/admin/service-requests/${encodeURIComponent(code)}/assign-technician`, {
-  method: 'PATCH',
-  headers: { Cookie: cookie },
-  body: JSON.stringify({ technicianId: 'TECH-001' }),
-});
+const assigned = await request(
+  `/admin/service-requests/${encodeURIComponent(code)}/assign-technician`,
+  {
+    method: 'PATCH',
+    headers: { Cookie: cookie },
+    body: JSON.stringify({
+      technicianId: 'TECH-001',
+      requestVersion: dataOf(
+        (
+          await request(`/admin/service-requests/${encodeURIComponent(code)}`, {
+            headers: { Cookie: cookie },
+          })
+        ).payload,
+      ).requestVersion,
+    }),
+  },
+);
 assert.equal(assigned.response.status, 200, messageOf(assigned.payload));
 
-const invalidAssignedCompleted = await adminPatch('COMPLETED', { finalPrice: 450000 });
+const invalidAssignedCompleted = await adminPatch('COMPLETED', {
+  finalPrice: 450000,
+});
 assert.equal(invalidAssignedCompleted.response.status, 400);
 assert.equal((await adminPatch('IN_PROGRESS')).response.status, 200);
 assert.equal((await adminPatch('WAITING_PARTS')).response.status, 200);
 assert.equal((await adminPatch('IN_PROGRESS')).response.status, 200);
-assert.equal((await adminPatch('COMPLETED', { finalPrice: 450000 })).response.status, 200);
+assert.equal(
+  (await adminPatch('COMPLETED', { finalPrice: 450000 })).response.status,
+  200,
+);
 assert.equal((await adminPatch('WARRANTY')).response.status, 200);
 assert.equal((await adminPatch('CLOSED')).response.status, 200);
 
 console.log('7. Verifying timeline, audit and terminal-state protection...');
-const adminDetail = await request(`/admin/service-requests/${encodeURIComponent(code)}`, {
-  headers: { Cookie: cookie },
-});
+const adminDetail = await request(
+  `/admin/service-requests/${encodeURIComponent(code)}`,
+  {
+    headers: { Cookie: cookie },
+  },
+);
 assert.equal(adminDetail.response.status, 200, messageOf(adminDetail.payload));
 const detail = dataOf(adminDetail.payload);
 assert.equal(detail.status, 'CLOSED');
@@ -137,12 +184,18 @@ assert.deepEqual(detail.allowedTransitions, []);
 assert.equal((await adminPatch('IN_PROGRESS')).response.status, 400);
 
 console.log('8. Confirming admin list receives the request immediately...');
-const list = await request(`/admin/service-requests?q=${encodeURIComponent(code)}`, {
-  headers: { Cookie: cookie },
-});
+const list = await request(
+  `/admin/service-requests?q=${encodeURIComponent(code)}`,
+  {
+    headers: { Cookie: cookie },
+  },
+);
 assert.equal(list.response.status, 200, messageOf(list.payload));
 const listPayload = list.payload?.data ?? list.payload;
 const rows = listPayload?.data ?? [];
-assert.equal(rows.some((row) => row.id === code), true);
+assert.equal(
+  rows.some((row) => row.id === code),
+  true,
+);
 
 console.log(`Phase 6 service-request integration passed for ${code}.`);
