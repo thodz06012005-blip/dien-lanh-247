@@ -139,6 +139,11 @@ export function validateEnvironment(
   const auditHashSalt = readString(source, 'AUDIT_LOG_HASH_SALT', {
     fallback: jwtAccessSecret,
   });
+  const serviceOnlyMode = readBoolean(source, 'SERVICE_ONLY_MODE', true);
+
+  if (nodeEnvironment === 'production' && !serviceOnlyMode) {
+    throw new Error('SERVICE_ONLY_MODE must be true in production.');
+  }
 
   if (nodeEnvironment === 'staging' || nodeEnvironment === 'production') {
     assertStrongSecret('JWT_ACCESS_SECRET', jwtAccessSecret);
@@ -285,5 +290,6 @@ export function validateEnvironment(
       true,
     ),
     SOFT_DELETE_ENABLED: readBoolean(source, 'SOFT_DELETE_ENABLED', true),
+    SERVICE_ONLY_MODE: serviceOnlyMode,
   };
 }

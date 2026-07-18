@@ -47,6 +47,7 @@ import {
 import api, { getApiErrorMessage } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { useToastStore } from '@/store/toastStore';
+import { env } from '@/config/env';
 
 type Tab = 'overview' | 'profile' | 'addresses' | 'services' | 'orders' | 'notifications' | 'security';
 
@@ -76,7 +77,7 @@ interface TabItem {
   icon: LucideIcon;
 }
 
-const tabs: TabItem[] = [
+const completeTabs: TabItem[] = [
   { id: 'overview', label: 'Tổng quan', icon: ShieldCheck },
   { id: 'profile', label: 'Hồ sơ cá nhân', icon: User },
   { id: 'addresses', label: 'Sổ địa chỉ', icon: MapPin },
@@ -85,6 +86,7 @@ const tabs: TabItem[] = [
   { id: 'notifications', label: 'Thông báo', icon: Bell },
   { id: 'security', label: 'Bảo mật & thiết bị', icon: KeyRound },
 ];
+const tabs = completeTabs.filter((tab) => !env.serviceOnlyMode || tab.id !== 'orders');
 
 const formatMoney = (value: number | string | undefined) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value || 0));
@@ -110,7 +112,7 @@ export default function Account() {
   const overviewQuery = useQuery({ queryKey: ['account-overview'], queryFn: getAccountOverview });
   const addressesQuery = useQuery({ queryKey: ['account-addresses'], queryFn: listAddresses, enabled: activeTab === 'addresses' || activeTab === 'overview' });
   const servicesQuery = useQuery({ queryKey: ['account-services'], queryFn: listAccountServiceRequests, enabled: activeTab === 'services' || activeTab === 'overview' });
-  const ordersQuery = useQuery({ queryKey: ['account-orders'], queryFn: listAccountOrders, enabled: activeTab === 'orders' || activeTab === 'overview' });
+  const ordersQuery = useQuery({ queryKey: ['account-orders'], queryFn: listAccountOrders, enabled: !env.serviceOnlyMode && (activeTab === 'orders' || activeTab === 'overview') });
   const notificationsQuery = useQuery({ queryKey: ['account-notifications'], queryFn: listNotifications, enabled: activeTab === 'notifications' || activeTab === 'overview' });
   const sessionsQuery = useQuery({ queryKey: ['account-sessions'], queryFn: listSessions, enabled: activeTab === 'security' || activeTab === 'overview' });
 
@@ -176,7 +178,7 @@ export default function Account() {
   const notifications = notificationsQuery.data || [];
   const unread = notifications.filter((item) => !item.readAt).length;
   const recentServices = useMemo(() => (servicesQuery.data || []).slice(0, 3) as AccountServiceRequest[], [servicesQuery.data]);
-  const recentOrders = useMemo(() => (ordersQuery.data || []).slice(0, 3) as AccountOrder[], [ordersQuery.data]);
+  const recentOrders = useMemo(() => env.serviceOnlyMode ? [] : (ordersQuery.data || []).slice(0, 3) as AccountOrder[], [ordersQuery.data]);
 
   const handleLogout = async () => {
     try { await api.post('/auth/logout'); } catch { /* session may already be expired */ }
@@ -228,7 +230,7 @@ export default function Account() {
           )}
           {activeTab === 'addresses' && <AddressesTab addresses={addressesQuery.data || []} form={addressForm} setForm={setAddressForm} addPending={addressMutation.isPending} deletePending={deleteAddressMutation.isPending} onAdd={() => addressMutation.mutate()} onDelete={(id) => deleteAddressMutation.mutate(id)} />}
           {activeTab === 'services' && <ServicesTab requests={(servicesQuery.data || []) as AccountServiceRequest[]} claim={claim} setClaim={setClaim} pending={claimMutation.isPending} onClaim={() => claimMutation.mutate()} onOpen={(id) => navigate(`/my-services/${id}`)} />}
-          {activeTab === 'orders' && <OrdersTab orders={(ordersQuery.data || []) as AccountOrder[]} />}
+          {!env.serviceOnlyMode && activeTab === 'orders' && <OrdersTab orders={(ordersQuery.data || []) as AccountOrder[]} />}
           {activeTab === 'notifications' && <NotificationsTab notifications={notifications} onRead={async (id) => { await markNotificationRead(id); void notificationsQuery.refetch(); refreshAccount(); }} onReadAll={async () => { await markAllNotificationsRead(); void notificationsQuery.refetch(); refreshAccount(); }} />}
           {activeTab === 'security' && <SecurityTab password={password} setPassword={setPassword} sessions={sessionsQuery.data || []} passwordPending={passwordMutation.isPending} revokePending={revokeMutation.isPending} onPassword={() => { if (password.newPassword !== password.confirmPassword) { showError('Mật khẩu xác nhận không khớp'); return; } passwordMutation.mutate(); }} onRevoke={(session) => revokeMutation.mutate(session)} />}
         </main>
@@ -256,11 +258,11 @@ function Empty({ icon: Icon, title, body }: { icon: LucideIcon; title: string; b
 function Overview({ account, recentServices, recentOrders, notifications, onTab }: { account?: AccountOverview; recentServices: AccountServiceRequest[]; recentOrders: AccountOrder[]; notifications: AccountNotification[]; onTab: (tab: Tab) => void }) {
   const cards: Array<{ icon: LucideIcon; label: string; value: number; tab: Tab }> = [
     { icon: Wrench, label: 'Dịch vụ', value: account?.stats.services || 0, tab: 'services' },
-    { icon: Package, label: 'Đơn hàng', value: account?.stats.orders || 0, tab: 'orders' },
+    ...(!env.serviceOnlyMode ? [{ icon: Package, label: 'Đơn hàng', value: account?.stats.orders || 0, tab: 'orders' as Tab }] : []),
     { icon: Bell, label: 'Chưa đọc', value: account?.stats.unreadNotifications || 0, tab: 'notifications' },
     { icon: Laptop, label: 'Phiên hoạt động', value: account?.stats.activeSessions || 0, tab: 'security' },
   ];
-  return <div className="space-y-6"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(({ icon: Icon, label, value, tab }) => <button type="button" key={label} onClick={() => onTab(tab)} className="rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-primary-600"><Icon className="h-5 w-5" /></div><strong className="mt-5 block text-3xl font-black text-slate-950">{value}</strong><span className="text-sm font-bold text-slate-500">{label}</span></button>)}</div><div className="grid gap-6 xl:grid-cols-2"><Panel title="Dịch vụ gần đây" subtitle="Các yêu cầu mới nhất của tài khoản.">{recentServices.length ? recentServices.map((item) => <div key={item.id} className="mb-3 rounded-2xl bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><strong className="font-mono text-xs">{item.id}</strong><StatusBadge value={item.status} /></div><p className="mt-2 text-sm font-bold text-slate-700">{item.serviceCategoryName}</p></div>) : <Empty icon={Wrench} title="Chưa có dịch vụ" body="Liên kết yêu cầu cũ hoặc tạo lịch mới." />}</Panel><Panel title="Đơn hàng gần đây" subtitle="Đơn mua sản phẩm và vật tư.">{recentOrders.length ? recentOrders.map((item) => <div key={item.id} className="mb-3 flex items-center justify-between rounded-2xl bg-slate-50 p-4"><div><strong className="font-mono text-xs">{item.orderNumber}</strong><p className="mt-1 text-xs text-slate-400">{formatDate(item.createdAt)}</p></div><strong className="text-sm text-primary-700">{formatMoney(item.totalAmount)}</strong></div>) : <Empty icon={ClipboardList} title="Chưa có đơn hàng" body="Đơn hàng của bạn sẽ xuất hiện tại đây." />}</Panel></div><Panel title="Thông báo mới" subtitle="Các cập nhật gần nhất liên quan đến tài khoản.">{notifications.length ? notifications.map((item) => <div key={String(item.id)} className="mb-3 rounded-2xl border border-slate-100 p-4"><strong className="text-sm">{item.title}</strong><p className="mt-1 text-sm text-slate-500">{item.body}</p></div>) : <Empty icon={Bell} title="Không có thông báo mới" body="Bạn đã cập nhật hết thông tin." />}</Panel></div>;
+  return <div className="space-y-6"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(({ icon: Icon, label, value, tab }) => <button type="button" key={label} onClick={() => onTab(tab)} className="rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-primary-600"><Icon className="h-5 w-5" /></div><strong className="mt-5 block text-3xl font-black text-slate-950">{value}</strong><span className="text-sm font-bold text-slate-500">{label}</span></button>)}</div><div className={`grid gap-6 ${env.serviceOnlyMode ? '' : 'xl:grid-cols-2'}`}><Panel title="Dịch vụ gần đây" subtitle="Các yêu cầu mới nhất của tài khoản.">{recentServices.length ? recentServices.map((item) => <div key={item.id} className="mb-3 rounded-2xl bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><strong className="font-mono text-xs">{item.id}</strong><StatusBadge value={item.status} /></div><p className="mt-2 text-sm font-bold text-slate-700">{item.serviceCategoryName}</p></div>) : <Empty icon={Wrench} title="Chưa có dịch vụ" body="Liên kết yêu cầu cũ hoặc tạo lịch mới." />}</Panel>{!env.serviceOnlyMode && <Panel title="Đơn hàng gần đây" subtitle="Đơn mua sản phẩm và vật tư.">{recentOrders.length ? recentOrders.map((item) => <div key={item.id} className="mb-3 flex items-center justify-between rounded-2xl bg-slate-50 p-4"><div><strong className="font-mono text-xs">{item.orderNumber}</strong><p className="mt-1 text-xs text-slate-400">{formatDate(item.createdAt)}</p></div><strong className="text-sm text-primary-700">{formatMoney(item.totalAmount)}</strong></div>) : <Empty icon={ClipboardList} title="Chưa có đơn hàng" body="Đơn hàng của bạn sẽ xuất hiện tại đây." />}</Panel>}</div><Panel title="Thông báo mới" subtitle="Các cập nhật gần nhất liên quan đến tài khoản.">{notifications.length ? notifications.map((item) => <div key={String(item.id)} className="mb-3 rounded-2xl border border-slate-100 p-4"><strong className="text-sm">{item.title}</strong><p className="mt-1 text-sm text-slate-500">{item.body}</p></div>) : <Empty icon={Bell} title="Không có thông báo mới" body="Bạn đã cập nhật hết thông tin." />}</Panel></div>;
 }
 
 function AddressesTab({ addresses, form, setForm, addPending, deletePending, onAdd, onDelete }: { addresses: Address[]; form: Omit<Address, 'id' | 'createdAt' | 'updatedAt'>; setForm: (value: Omit<Address, 'id' | 'createdAt' | 'updatedAt'>) => void; addPending: boolean; deletePending: boolean; onAdd: () => void; onDelete: (id: number) => void }) {

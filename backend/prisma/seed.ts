@@ -1,10 +1,12 @@
 import { PrismaClient, UserRole, DiscountType, ServiceRequestStatus, ServiceRequestPriority, TechnicianStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { resolveServiceOnlyMode } from '../src/config/service-only';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding database...');
+  const serviceOnlyMode = resolveServiceOnlyMode(process.env);
 
   // 1. Create Admins & Users
   const seedEmail = process.env.ADMIN_SEED_EMAIL || 'admin@dienlanh247.vn';
@@ -35,6 +37,7 @@ async function main() {
   });
   console.log('Created Admin:', admin.email);
 
+  if (!serviceOnlyMode) {
   // 2. Create Categories (Products)
   const catElectronics = await prisma.category.upsert({
     where: { slug: 'dien-lanh' },
@@ -212,6 +215,9 @@ async function main() {
     });
   }
   console.log('Seeded coupons.');
+  } else {
+    console.log('SERVICE_ONLY_MODE=true: skipped product categories, brands, products and coupons.');
+  }
 
   // 6. Create Service Categories
   const serviceCats = [

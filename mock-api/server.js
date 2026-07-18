@@ -21,6 +21,7 @@ const { isValidPhone, isValidEmail, slugify } = require('./utils/validators');
 const { getInitialData } = require('./seed/initialData');
 const { checkLoginRateLimit, recordLoginFailure, recordLoginSuccess } = require('./utils/rateLimit');
 const { auditSuccess, auditFailure, auditRateLimited } = require('./utils/auditLog');
+const { resolveServiceOnlyMode, serviceOnlyMiddleware } = require('./config/serviceOnly');
 
 const publicRoutes = require('./routes/public');
 const { router: serviceRequestRouter, updateTechnicianStatusAfterJobChange } = require('./routes/serviceRequests');
@@ -38,6 +39,7 @@ const auditLogsRouter = require('./routes/auditLogs');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const serviceOnlyMode = resolveServiceOnlyMode(process.env);
 
 const corsOriginsEnv = process.env.CORS_ORIGINS || process.env.ALLOWED_ORIGINS;
 const allowedOrigins = corsOriginsEnv
@@ -104,6 +106,7 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: JSON_LIMIT }));
 app.use(express.urlencoded({ extended: false, limit: URLENCODED_LIMIT }));
+app.use('/api/v1', serviceOnlyMiddleware(serviceOnlyMode));
 app.use('/api/v1', publicRoutes);
 app.use('/api/v1', serviceRequestRouter);
 app.use('/api/v1', technicianRouter);
@@ -117,7 +120,10 @@ app.use('/api/v1', contactRouter);
 app.use('/api/v1', devRouter);
 app.use('/api/v1', auditLogsRouter);
 
-setInitialDataGenerator(getInitialData);
+setInitialDataGenerator(() => getInitialData({
+  ...process.env,
+  SERVICE_ONLY_MODE: String(serviceOnlyMode)
+}));
 
 // Removed old auth users, sessions, requireAdminAuth, and updateTechnicianStatusAfterJobChange. Imported from utils/auth and routes/serviceRequests instead.
 

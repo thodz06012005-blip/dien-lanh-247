@@ -4,6 +4,7 @@ import MainLayout from '@/layouts/MainLayout';
 import SeoManager from '@/seo/SeoManager';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/services/api';
+import { env } from '@/config/env';
 
 const Home = lazy(() => import('@/pages/Home'));
 const Services = lazy(() => import('@/pages/Services'));
@@ -130,10 +131,20 @@ export default function AppRouter() {
             <Route path="about" element={<About />} />
             <Route path="contact" element={<Contact />} />
             <Route path="policy/:slug" element={<Policy />} />
-            <Route path="products" element={<Products />} />
-            <Route path="products/:id" element={<ProductDetail />} />
-            <Route path="cart" element={<Cart />} />
-            <Route path="checkout" element={<Checkout />} />
+            {env.serviceOnlyMode ? (
+              <>
+                <Route path="products/*" element={<Navigate to="/services" replace />} />
+                <Route path="cart" element={<Navigate to="/service-booking" replace />} />
+                <Route path="checkout" element={<Navigate to="/service-booking" replace />} />
+              </>
+            ) : (
+              <>
+                <Route path="products" element={<Products />} />
+                <Route path="products/:id" element={<ProductDetail />} />
+                <Route path="cart" element={<Cart />} />
+                <Route path="checkout" element={<Checkout />} />
+              </>
+            )}
             <Route path="service-booking" element={<ServiceBooking />} />
             <Route path="service-booking/success" element={<ServiceBookingSuccess />} />
             <Route path="service-lookup" element={<ServiceRequestLookup />} />
@@ -141,7 +152,11 @@ export default function AppRouter() {
             <Route path="design-system" element={<DesignSystem />} />
             <Route element={<ProtectedRoute />}>
               <Route path="account" element={<Account />} />
-              <Route path="orders" element={<Orders />} />
+              {env.serviceOnlyMode ? (
+                <Route path="orders/*" element={<Navigate to="/account?tab=services" replace />} />
+              ) : (
+                <Route path="orders" element={<Orders />} />
+              )}
               <Route path="my-services" element={<MyServices />} />
               <Route path="my-services/:id" element={<MyServiceDetail />} />
             </Route>

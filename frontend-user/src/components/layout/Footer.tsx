@@ -3,6 +3,7 @@ import { Clock3, Mail, MapPin, MessageCircle, Phone, ShieldCheck, Wrench } from 
 import { Link } from 'react-router-dom';
 import { useSettings } from '@/hooks/useSettings';
 import { getSiteContent, type SiteSectionContent } from '@/services/contentApi';
+import { env } from '@/config/env';
 
 interface FooterLink {
   label: string;
@@ -55,7 +56,12 @@ function safeLinks(value: unknown, fallback: FooterLink[]) {
     (item): item is FooterLink =>
       Boolean(item && typeof item === 'object' && 'label' in item && 'to' in item),
   );
-  return links.length ? links : fallback;
+  const selected = links.length ? links : fallback;
+  if (!env.serviceOnlyMode) return selected;
+  return selected.filter(
+    (item) => !/^\/(?:products|cart|checkout|orders)(?:\/|\?|$)/.test(item.to)
+      && !/^\/policy\/(?:shipping|returns)(?:\/|\?|$)/.test(item.to),
+  );
 }
 
 function FooterLinks({ title, links }: { title: string; links: FooterLink[] }) {
@@ -185,12 +191,14 @@ export default function Footer() {
               >
                 Lịch sửa chữa
               </Link>
-              <Link
-                to="/orders"
-                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-black text-white hover:bg-white/10"
-              >
-                Đơn hàng
-              </Link>
+              {!env.serviceOnlyMode && (
+                <Link
+                  to="/orders"
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-black text-white hover:bg-white/10"
+                >
+                  Đơn hàng
+                </Link>
+              )}
             </div>
           </div>
         </div>
