@@ -28,7 +28,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      NODE_ENV: test
       DATASET_CLASSIFICATION: synthetic
       DATABASE_URL: mysql://root:password@127.0.0.1:3306/dien_lanh_247
       JWT_ACCESS_SECRET: test_only_phase9_access_secret_at_least_32_characters
