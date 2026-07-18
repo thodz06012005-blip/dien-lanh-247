@@ -18,7 +18,7 @@
     "dev:all": "npm run assets:sync && concurrently -k -n MOCK,USER,ADMIN -c yellow,cyan,magenta \"npm run dev:mock\" \"npm run dev:user\" \"npm run dev:admin\"",
     "dev:platform": "npm run assets:sync && concurrently -k -n API,USER,ADMIN -c green,cyan,magenta \"npm run dev:backend\" \"npm run dev:user\" \"npm run dev:admin\"",
     "build": "npm run build:all",
-    "build:user": "npm --prefix frontend-user run build",
+    "build:user": "npm --prefix frontend-user run build && node scripts/verify-customer-service-only-bundle.mjs",
     "build:admin": "npm --prefix frontend-admin run build",
     "build:backend": "npm --prefix backend run build",
     "build:all": "npm run assets:sync && npm run build:user && npm run build:admin && npm run build:backend",

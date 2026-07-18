@@ -6,7 +6,7 @@ const adminBase = (process.env.PHASE15_ADMIN_URL || 'http://localhost:5174').rep
 const customerPages = [
   ['home', '/'],
   ['services', '/services'],
-  ['products', '/products'],
+  ['legacy-products-redirect', '/products', '/services'],
   ['service-booking', '/service-booking'],
   ['login', '/login'],
 ];
@@ -76,11 +76,22 @@ async function verifyResponsivePage(page, url, testInfo, label) {
 }
 
 test.describe('customer portal responsive acceptance', () => {
-  for (const [name, path] of customerPages) {
+  for (const [name, path, expectedPath] of customerPages) {
     test(`${name} remains usable`, async ({ page }, testInfo) => {
       await verifyResponsivePage(page, `${userBase}${path}`, testInfo, `customer-${name}`);
+      if (expectedPath) expect(new URL(page.url()).pathname).toBe(expectedPath);
     });
   }
+});
+
+test('customer home supports keyboard navigation', async ({ page }) => {
+  await installMockApiBridge(page, `${userBase}/`);
+  await page.goto(`${userBase}/`, { waitUntil: 'domcontentloaded' });
+  const skipLink = page.locator('.ds-skip-link');
+  await skipLink.focus();
+  await expect(skipLink).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#main-content')).toBeFocused();
 });
 
 test('admin login remains usable', async ({ page }, testInfo) => {

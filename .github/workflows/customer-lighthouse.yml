@@ -170,7 +170,7 @@ jobs:
           # selected preserve all Phase 13 thresholds without accepting a best run.
           audit_route home / mobile 3
           audit_route services /services mobile
-          audit_route products /products mobile
+          audit_route projects /projects mobile
           audit_route articles /articles mobile
           audit_route booking /service-booking mobile
           audit_route home / desktop

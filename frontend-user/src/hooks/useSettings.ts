@@ -5,8 +5,6 @@ export interface PublicSettings {
   zalo: string;
   email: string;
   address: string;
-  shippingFee: number;
-  freeShippingThreshold: number;
 }
 
 export const defaultSettings: PublicSettings = {
@@ -14,8 +12,6 @@ export const defaultSettings: PublicSettings = {
   zalo: '0987654321',
   email: 'support@dienlanh247.vn',
   address: '123 Đường Cầu Giấy, Hà Nội',
-  shippingFee: 30000,
-  freeShippingThreshold: 5000000,
 };
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api/v1').replace(/\/$/, '');

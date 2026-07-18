@@ -21,16 +21,34 @@ function resolveMedia(value?: string | null) {
   return `${api.replace(/\/api\/v1\/?$/, '')}${url}`;
 }
 
-function Cta({ href, label }: { href?: string | null; label?: string | null }) {
+function serviceOnlyHref(value: string) {
+  if (/^\/products(?:\/|\?|$)/i.test(value)) return '/services';
+  if (/^\/(?:cart|checkout)(?:\/|\?|$)/i.test(value)) return '/service-booking';
+  if (/^\/orders(?:\/|\?|$)/i.test(value)) return '/account?tab=services';
+  if (/^\/policy\/shipping(?:\/|\?|$)/i.test(value)) return '/policy/terms';
+  if (/^\/policy\/(?:return|returns)(?:\/|\?|$)/i.test(value)) return '/policy/warranty';
+  return value;
+}
+
+function sanitizeManagedHtml(value: string) {
+  return value.replace(
+    /href=(["'])(\/(?:products|cart|checkout|orders|policy\/(?:shipping|return|returns))[^"']*)\1/gi,
+    (_match, quote: string, href: string) => `href=${quote}${serviceOnlyHref(href)}${quote}`,
+  );
+}
+
+function Cta({ href, label, variant = 'primary' }: { href?: string | null; label?: string | null; variant?: 'primary' | 'secondary' }) {
   if (!href || !label) return null;
-  const className =
-    'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5';
-  return href.startsWith('/') ? (
-    <Link to={href} className={className}>
+  const safeHref = serviceOnlyHref(href);
+  const className = variant === 'primary'
+    ? 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 motion-reduce:transform-none'
+    : 'inline-flex min-h-11 items-center justify-center rounded-xl border border-white/20 bg-white/10 px-5 text-sm font-black text-white backdrop-blur transition hover:bg-white/15';
+  return safeHref.startsWith('/') ? (
+    <Link to={safeHref} className={className}>
       {label}<ArrowRight className="h-4 w-4" />
     </Link>
   ) : (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+    <a href={safeHref} target="_blank" rel="noopener noreferrer" className={className}>
       {label}<ArrowRight className="h-4 w-4" />
     </a>
   );
@@ -59,13 +77,7 @@ function CampaignBanner({ banner }: { banner: SiteBanner }) {
           {banner.subtitle && <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">{banner.subtitle}</p>}
           <div className="mt-7 flex flex-wrap gap-3">
             <Cta href={banner.ctaUrl} label={banner.ctaLabel} />
-            {banner.secondaryCtaUrl && banner.secondaryCtaLabel && (
-              banner.secondaryCtaUrl.startsWith('/') ? (
-                <Link to={banner.secondaryCtaUrl} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/20 bg-white/10 px-5 text-sm font-black text-white backdrop-blur hover:bg-white/15">{banner.secondaryCtaLabel}</Link>
-              ) : (
-                <a href={banner.secondaryCtaUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/20 bg-white/10 px-5 text-sm font-black text-white backdrop-blur hover:bg-white/15">{banner.secondaryCtaLabel}</a>
-              )
-            )}
+            <Cta href={banner.secondaryCtaUrl} label={banner.secondaryCtaLabel} variant="secondary" />
           </div>
         </div>
       </div>
@@ -101,7 +113,7 @@ export default function CmsManagedHomepage({ fallbackTestimonials }: CmsManagedH
           <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
             {section.eyebrow && <p className="text-xs font-black uppercase tracking-[0.2em] text-primary-600">{section.eyebrow}</p>}
             {section.title && <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">{section.title}</h2>}
-            {section.content && <div className="prose prose-slate mx-auto mt-6 max-w-none text-left text-sm leading-7" dangerouslySetInnerHTML={{ __html: section.content }} />}
+            {section.content && <div className="prose prose-slate mx-auto mt-6 max-w-none text-left text-sm leading-7" dangerouslySetInnerHTML={{ __html: sanitizeManagedHtml(section.content) }} />}
           </div>
         </section>
       ))}

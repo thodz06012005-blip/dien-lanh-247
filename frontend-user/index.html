@@ -51,7 +51,6 @@
     <script>
       (()=>{const path=location.pathname;const routes={
         '/services':['Dịch vụ điện lạnh','Dịch vụ rõ phạm vi, giá và bảo hành','Khám phá dịch vụ sửa chữa, vệ sinh, lắp đặt và bảo trì thiết bị điện lạnh.'],
-        '/products':['Sản phẩm chính hãng','Sản phẩm điện lạnh phù hợp cho gia đình Việt','Tìm kiếm, lọc và so sánh sản phẩm với giá bán và tình trạng kho rõ ràng.'],
         '/articles':['Trung tâm kiến thức','Kiến thức điện lạnh dễ hiểu và thực tế','Bài viết có tác giả, lịch xuất bản và hướng dẫn sử dụng thiết bị hiệu quả.'],
         '/service-booking':['Đặt lịch trong vài phút','Đặt lịch sửa chữa và nhận mã theo dõi','Chọn dịch vụ, thời gian và gửi hình ảnh hiện trạng trong một quy trình rõ ràng.']
       };const value=routes[path];if(!value)return;document.getElementById('boot-eyebrow').textContent=value[0];document.getElementById('boot-title').textContent=value[1];document.getElementById('boot-description').textContent=value[2]})();

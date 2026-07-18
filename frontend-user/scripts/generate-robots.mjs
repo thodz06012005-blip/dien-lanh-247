@@ -13,10 +13,7 @@ const siteUrl = (environment.VITE_SITE_URL || environment.SITE_URL || 'https://d
 
 const privatePaths = [
   '/account',
-  '/orders',
   '/my-services',
-  '/cart',
-  '/checkout',
   '/login',
   '/register',
   '/forgot-password',

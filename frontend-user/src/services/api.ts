@@ -50,7 +50,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         useAuthStore.getState().clearSession();
         const currentHash = window.location.hash.replace(/^#/, '') || '/';
-        const protectedPath = ['/account', '/orders', '/my-services'].some((path) => currentHash.startsWith(path));
+        const protectedPath = ['/account', '/my-services'].some((path) => currentHash.startsWith(path));
         if (protectedPath) {
           window.location.hash = `#/login?returnTo=${encodeURIComponent(currentHash)}`;
         }

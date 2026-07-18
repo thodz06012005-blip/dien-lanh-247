@@ -7,39 +7,30 @@ import {
   MessageCircle,
   Phone,
   Search,
-  ShoppingCart,
   UserRound,
   X,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
-import { useCartStore } from '@/store/cartStore';
 import { useSettings } from '@/hooks/useSettings';
-import { env } from '@/config/env';
 
-const completeNavigation = [
+const navigation = [
   { label: 'Trang chủ', to: '/' },
   { label: 'Dịch vụ', to: '/services' },
   { label: 'Tra cứu', to: '/service-lookup', icon: Search },
   { label: 'Dự án', to: '/projects' },
   { label: 'Bài viết', to: '/articles' },
-  { label: 'Sản phẩm', to: '/products' },
   { label: 'Giới thiệu', to: '/about' },
   { label: 'Liên hệ', to: '/contact' },
 ];
-const navigation = completeNavigation.filter(
-  (item) => !env.serviceOnlyMode || item.to !== '/products',
-);
 
 export default function Header() {
   const { settings } = useSettings();
   const { isAuthenticated, user, logout } = useAuthStore();
-  const { items } = useCartStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const hotline = settings?.hotline || '1900 1234';
   const zalo = settings?.zalo || hotline;
-  const cartCount = items.reduce((total, item) => total + item.quantity, 0);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -109,11 +100,6 @@ export default function Header() {
             <Link to="/service-booking" className="hidden min-h-11 items-center gap-2 rounded-xl bg-orange-700 px-4 text-sm font-black text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-800 lg:inline-flex">
               <CalendarDays aria-hidden="true" className="h-4 w-4" /> Đặt lịch
             </Link>
-
-            {!env.serviceOnlyMode && <Link to="/cart" className="relative flex h-11 w-11 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100" aria-label={`Giỏ hàng có ${cartCount} sản phẩm`}>
-              <ShoppingCart aria-hidden="true" className="h-5 w-5" />
-              {cartCount > 0 && <span className="absolute right-0.5 top-0.5 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-orange-700 px-1 text-[9px] font-black text-white">{cartCount > 99 ? '99+' : cartCount}</span>}
-            </Link>}
 
             <Link to={isAuthenticated ? '/account' : '/login'} className="hidden h-11 items-center gap-2 rounded-xl px-3 text-sm font-extrabold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 sm:flex">
               <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-primary-800">{isAuthenticated ? (user?.firstName || user?.email || 'K').charAt(0).toUpperCase() : <UserRound className="h-4 w-4" />}</span>

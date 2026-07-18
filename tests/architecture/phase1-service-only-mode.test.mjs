@@ -97,15 +97,16 @@ test('all four applications declare the feature flag and server guard is global'
   assert.match(mockServer, /serviceOnlyMiddleware\(serviceOnlyMode\)/);
 });
 
-test('frontend navigation and routes are gated without hiding service surfaces', () => {
+test('admin commerce routes stay gated while the customer app is permanently service-only', () => {
   const customerRouter = source('frontend-user/src/router/AppRouter.tsx');
   const customerHeader = source('frontend-user/src/components/layout/Header.tsx');
   const adminRouter = source('frontend-admin/src/router/AppRouter.tsx');
   const adminNavigation = source('frontend-admin/src/config/adminNavigation.ts');
 
-  assert.match(customerRouter, /env\.serviceOnlyMode/);
   assert.match(customerRouter, /path="products\/\*"/);
-  assert.match(customerHeader, /!env\.serviceOnlyMode/);
+  assert.match(customerRouter, /to="\/services" replace/);
+  assert.doesNotMatch(customerRouter, /pages\/(?:Products|ProductDetail|Cart|Checkout|Orders)/);
+  assert.doesNotMatch(customerHeader, /serviceOnlyMode|ShoppingCart|cartStore/);
   assert.match(adminRouter, /path="orders\/\*"/);
   assert.match(adminNavigation, /commerceOnly: true/);
   assert.match(customerRouter, /path="service-booking"/);

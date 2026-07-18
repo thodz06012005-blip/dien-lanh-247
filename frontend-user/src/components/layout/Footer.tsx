@@ -3,7 +3,6 @@ import { Clock3, Mail, MapPin, MessageCircle, Phone, ShieldCheck, Wrench } from 
 import { Link } from 'react-router-dom';
 import { useSettings } from '@/hooks/useSettings';
 import { getSiteContent, type SiteSectionContent } from '@/services/contentApi';
-import { env } from '@/config/env';
 
 interface FooterLink {
   label: string;
@@ -34,15 +33,12 @@ const fallbackCompanyLinks: FooterLink[] = [
   { label: 'Giới thiệu', to: '/about' },
   { label: 'Dự án tiêu biểu', to: '/projects' },
   { label: 'Bài viết kiến thức', to: '/articles' },
-  { label: 'Sản phẩm', to: '/products' },
   { label: 'Liên hệ', to: '/contact' },
 ];
 const fallbackPolicyLinks: FooterLink[] = [
   { label: 'Chính sách bảo hành', to: '/policy/warranty' },
   { label: 'Chính sách bảo mật', to: '/policy/privacy' },
   { label: 'Điều khoản sử dụng', to: '/policy/terms' },
-  { label: 'Giao nhận & lắp đặt', to: '/policy/shipping' },
-  { label: 'Đổi trả', to: '/policy/returns' },
   { label: 'Thanh toán', to: '/policy/payment' },
 ];
 
@@ -57,7 +53,6 @@ function safeLinks(value: unknown, fallback: FooterLink[]) {
       Boolean(item && typeof item === 'object' && 'label' in item && 'to' in item),
   );
   const selected = links.length ? links : fallback;
-  if (!env.serviceOnlyMode) return selected;
   return selected.filter(
     (item) => !/^\/(?:products|cart|checkout|orders)(?:\/|\?|$)/.test(item.to)
       && !/^\/policy\/(?:shipping|returns)(?:\/|\?|$)/.test(item.to),
@@ -184,21 +179,13 @@ export default function Footer() {
           <FooterLinks title="Khám phá" links={companyLinks} />
           <div>
             <FooterLinks title="Chính sách" links={policyLinks} />
-            <div className="mt-7 grid grid-cols-2 gap-2">
+            <div className="mt-7">
               <Link
                 to="/my-services"
-                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-black text-white hover:bg-white/10"
+                className="block rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-black text-white hover:bg-white/10"
               >
                 Lịch sửa chữa
               </Link>
-              {!env.serviceOnlyMode && (
-                <Link
-                  to="/orders"
-                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-black text-white hover:bg-white/10"
-                >
-                  Đơn hàng
-                </Link>
-              )}
             </div>
           </div>
         </div>

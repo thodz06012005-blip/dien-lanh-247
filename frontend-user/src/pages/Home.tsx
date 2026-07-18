@@ -17,6 +17,7 @@ import { Link } from 'react-router-dom';
 import OptimizedImage from '@/components/common/OptimizedImage';
 import QuickContactForm from '@/components/contact/QuickContactForm';
 import CmsManagedHomepage from '@/components/cms/CmsManagedHomepage';
+import PricingTable from '@/components/home/PricingTable';
 import { articles, processSteps, projects, reasons, services, testimonials } from '@/data/phase4Content';
 import useDocumentTitle from '@/hooks/useDocumentTitle';
 import { useSettings } from '@/hooks/useSettings';
@@ -103,7 +104,7 @@ export default function Home() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 to="/service-booking"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-orange-700 px-5 text-sm font-black text-white shadow-xl transition hover:-translate-y-0.5 hover:bg-orange-800"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-orange-700 px-5 text-sm font-black text-white shadow-xl transition hover:-translate-y-0.5 hover:bg-orange-800 motion-reduce:transform-none"
               >
                 Đặt lịch kỹ thuật <ArrowRight aria-hidden="true" className="h-4 w-4" />
               </Link>
@@ -169,7 +170,7 @@ export default function Home() {
           </div>
           <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {services.slice(0, 3).map((service) => (
-              <article key={service.slug} className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl">
+              <article key={service.slug} className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl motion-reduce:transform-none">
                 <div className="relative aspect-[16/10] overflow-hidden">
                   <OptimizedImage
                     src={service.image}
@@ -177,7 +178,7 @@ export default function Home() {
                     width={720}
                     height={450}
                     sizes="(max-width: 768px) 100vw, 33vw"
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04] motion-reduce:transform-none"
                   />
                   <span className="absolute left-4 top-4 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-slate-800 shadow-sm">
                     {service.priceLabel}
@@ -199,6 +200,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <PricingTable />
 
       <section className="py-20 sm:py-24">
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
@@ -264,7 +267,7 @@ export default function Home() {
                   width={900}
                   height={620}
                   sizes="(max-width: 1024px) 100vw, 50vw"
-                  className="absolute inset-0 h-full w-full object-cover opacity-65 transition duration-500 group-hover:scale-105"
+                  className="absolute inset-0 h-full w-full object-cover opacity-65 transition duration-500 group-hover:scale-105 motion-reduce:transform-none"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/45 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">

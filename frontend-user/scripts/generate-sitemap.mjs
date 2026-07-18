@@ -22,7 +22,6 @@ const apiUrl = (
 const staticEntries = [
   { path: '/', changefreq: 'daily', priority: '1.0' },
   { path: '/services', changefreq: 'weekly', priority: '0.9' },
-  { path: '/products', changefreq: 'daily', priority: '0.9' },
   { path: '/projects', changefreq: 'weekly', priority: '0.8' },
   { path: '/articles', changefreq: 'daily', priority: '0.8' },
   { path: '/about', changefreq: 'monthly', priority: '0.6' },
@@ -31,8 +30,6 @@ const staticEntries = [
   { path: '/policy/warranty', changefreq: 'yearly', priority: '0.4' },
   { path: '/policy/privacy', changefreq: 'yearly', priority: '0.3' },
   { path: '/policy/terms', changefreq: 'yearly', priority: '0.3' },
-  { path: '/policy/shipping', changefreq: 'yearly', priority: '0.3' },
-  { path: '/policy/returns', changefreq: 'yearly', priority: '0.3' },
   { path: '/policy/payment', changefreq: 'yearly', priority: '0.3' },
 ];
 
@@ -40,7 +37,6 @@ const dynamicSources = [
   { endpoint: '/services', route: '/services', priority: '0.8', changefreq: 'weekly' },
   { endpoint: '/projects', route: '/projects', priority: '0.7', changefreq: 'monthly' },
   { endpoint: '/posts', route: '/articles', priority: '0.7', changefreq: 'weekly' },
-  { endpoint: '/products', route: '/products', priority: '0.8', changefreq: 'daily' },
 ];
 
 function escapeXml(value) {
