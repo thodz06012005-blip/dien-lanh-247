@@ -30,6 +30,28 @@ async function main() {
     },
   });
 
+  const staffEmail = process.env.STAFF_SEED_EMAIL?.trim().toLowerCase();
+  const staffPassword = process.env.STAFF_SEED_PASSWORD;
+  if (Boolean(staffEmail) !== Boolean(staffPassword)) {
+    throw new Error('STAFF_SEED_EMAIL and STAFF_SEED_PASSWORD must be provided together');
+  }
+  if (staffEmail && staffPassword) {
+    if (staffPassword.length < 12) {
+      throw new Error('STAFF_SEED_PASSWORD must contain at least 12 characters');
+    }
+    await prisma.user.upsert({
+      where: { email: staffEmail },
+      update: { password: await bcrypt.hash(staffPassword, 10), role: UserRole.STAFF },
+      create: {
+        email: staffEmail,
+        password: await bcrypt.hash(staffPassword, 10),
+        firstName: 'Nhân viên',
+        lastName: 'UAT',
+        role: UserRole.STAFF,
+      },
+    });
+  }
+
   const serviceCategories = [
     ['sua-dieu-hoa', 'Sửa điều hòa', 'Wind'],
     ['ve-sinh-dieu-hoa', 'Vệ sinh điều hòa', 'Droplets'],

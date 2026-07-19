@@ -75,6 +75,11 @@ body {
   @apply bg-[#F5F7FB] text-slate-800 font-sans antialiased m-0 p-0;
 }
 
+@keyframes connectivity-slide {
+  from { opacity: 0; transform: translateY(-100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Custom Scrollbar for elegant look */
 ::-webkit-scrollbar {
   width: 6px;

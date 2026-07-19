@@ -29,6 +29,9 @@ const serviceOnlyMode = raw.VITE_SERVICE_ONLY_MODE === 'true';
 if (raw.VITE_APP_ENV === 'production' && !serviceOnlyMode) {
   throw new Error('VITE_SERVICE_ONLY_MODE must be true in production.');
 }
+if (raw.VITE_APP_ENV === 'production' && useMockApi) {
+  throw new Error('VITE_USE_MOCK_API must be false in production.');
+}
 
 export const env = Object.freeze({
   appName: raw.VITE_APP_NAME,

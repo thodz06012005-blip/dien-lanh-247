@@ -211,8 +211,18 @@ export default function ServiceBooking() {
         },
       });
     } catch (error: unknown) {
-      const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
-      showError(message || 'Không thể gửi yêu cầu. Vui lòng kiểm tra thông tin và thử lại.');
+      const apiError = error as {
+        code?: string;
+        response?: { data?: { message?: string; error?: { message?: string } } };
+      };
+      const message = apiError.response?.data?.error?.message || apiError.response?.data?.message;
+      if (!navigator.onLine || apiError.code === 'ERR_NETWORK') {
+        showError('Chưa thể kết nối tới hệ thống. Thông tin vẫn được giữ; vui lòng kết nối lại rồi gửi lần nữa.');
+      } else if (apiError.code === 'ECONNABORTED') {
+        showError('Máy chủ phản hồi chậm. Vui lòng thử lại; khóa gửi an toàn sẽ ngăn tạo yêu cầu trùng.');
+      } else {
+        showError(message || 'Không thể gửi yêu cầu. Vui lòng kiểm tra thông tin và thử lại.');
+      }
     } finally {
       setIsSubmitting(false);
     }

@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "decision": "NO_GO",
+  "uatSigned": false,
+  "handoverSigned": false,
+  "productionReadinessVerified": false,
+  "openP0": 0,
+  "openP1": 0,
+  "approvedBy": {
+    "owner": "",
+    "operations": "",
+    "qa": ""
+  },
+  "approvedAt": "",
+  "note": "Technical automation may pass, but release remains blocked until real staging UAT and handover signatures are complete."
+}

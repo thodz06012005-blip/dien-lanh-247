@@ -1,0 +1,32 @@
+name: Release v1.0.0
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_release:
+        description: 'I confirm signed UAT, handover and production readiness are complete'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: inputs.confirm_release == true
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Verify signed release gate
+        run: node scripts/verify-release-gate.mjs
+      - name: Verify release version
+        run: test "$(node -p "require('./package.json').version")" = '1.0.0'
+      - name: Create immutable GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create v1.0.0 --target "$GITHUB_SHA" --title 'Điện Lạnh 247 v1.0.0' --notes-file docs/phase-11-12/RELEASE_NOTES_v1.0.0.md --verify-tag=false

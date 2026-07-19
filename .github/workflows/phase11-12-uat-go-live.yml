@@ -1,0 +1,181 @@
+name: Phase 11-12 UAT and Go-live Gates
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend-user/**'
+      - 'frontend-admin/**'
+      - 'mock-api/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'deploy/**'
+      - 'docs/phase-11-12/**'
+      - 'package.json'
+      - '.github/workflows/phase11-12-uat-go-live.yml'
+      - '.github/workflows/release-v1.0.0.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase11-12-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, Typecheck, Unit, Architecture, Mock and Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NODE_ENV: test
+      DATABASE_URL: mysql://root:phase11_quality@127.0.0.1:3306/ecommerce
+      JWT_ACCESS_SECRET: phase11_quality_access_secret_more_than_32_characters
+      JWT_REFRESH_SECRET: phase11_quality_refresh_secret_more_than_32_characters
+      AUDIT_LOG_HASH_SALT: phase11_quality_audit_salt_more_than_32_characters
+      CORS_ORIGINS: http://localhost:5173,http://localhost:5174
+      COOKIE_SECURE: 'false'
+      ENABLE_DEV_ENDPOINTS: 'false'
+      ENABLE_DEMO_ACCOUNTS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend-user/package-lock.json
+            frontend-admin/package-lock.json
+            backend/package-lock.json
+            mock-api/package-lock.json
+      - name: Clean install
+        run: |
+          npm ci
+          npm --prefix frontend-user ci
+          npm --prefix frontend-admin ci
+          npm --prefix backend ci
+          npm --prefix mock-api ci
+      - run: npm run prisma:generate
+      - name: Full static, unit and contract suite
+        run: |
+          npm run security:scan
+          npm run lint
+          npm run typecheck
+          npm run test:unit
+          npm run test:architecture
+          npm run test:production-readiness-config
+          npm run build:all
+      - name: Mock API service-only contract
+        run: |
+          ENABLE_DEV_ENDPOINTS=true ENABLE_DEMO_ACCOUNTS=true npm --prefix mock-api run start > phase11-quality-mock.log 2>&1 & echo $! > phase11-quality-mock.pid
+          for attempt in {1..60}; do nc -z 127.0.0.1 3001 && break; sleep 1; done
+          nc -z 127.0.0.1 3001
+          ENABLE_DEV_ENDPOINTS=true ENABLE_DEMO_ACCOUNTS=true npm run test:mock
+      - name: Reset and stop quality Mock API
+        if: always()
+        run: |
+          npm --prefix mock-api run reset-db || true
+          if [ -f phase11-quality-mock.pid ]; then kill "$(cat phase11-quality-mock.pid)" 2>/dev/null || true; fi
+      - name: Confirm unsigned release is blocked
+        run: if npm run test:release-gate; then echo 'Unsigned release was accepted'; exit 1; else echo 'Unsigned release correctly blocked'; fi
+
+  api-risk-matrix:
+    name: Three Roles and Failure Matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: phase11_root_fixture
+          MYSQL_DATABASE: ecommerce
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pphase11_root_fixture"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    env:
+      NODE_ENV: test
+      HOST: 127.0.0.1
+      PORT: 3000
+      API_PREFIX: api/v1
+      DATABASE_URL: mysql://root:phase11_root_fixture@127.0.0.1:3306/ecommerce
+      JWT_ACCESS_SECRET: phase11_access_secret_more_than_32_characters
+      JWT_REFRESH_SECRET: phase11_refresh_secret_more_than_32_characters
+      AUDIT_LOG_HASH_SALT: phase11_audit_salt_more_than_32_characters
+      CORS_ORIGINS: http://localhost:5173,http://localhost:5174
+      COOKIE_SECURE: 'false'
+      ENABLE_DEV_ENDPOINTS: 'false'
+      ENABLE_DEMO_ACCOUNTS: 'false'
+      ADMIN_SEED_EMAIL: admin-phase11@example.test
+      ADMIN_SEED_PASSWORD: Phase11AdminFixture123
+      STAFF_SEED_EMAIL: staff-phase11@example.test
+      STAFF_SEED_PASSWORD: Phase11StaffFixture123
+      PHASE11_API_URL: http://127.0.0.1:3000/api/v1
+      NOTIFICATION_WORKER_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm --prefix backend ci
+      - name: Migrate, seed and start production build
+        run: |
+          npm --prefix backend run prisma:generate
+          npm --prefix backend run prisma:migrate:deploy
+          npm --prefix backend run prisma:seed
+          npm --prefix backend run build
+          npm --prefix backend run start:prod > phase11-api.log 2>&1 & echo $! > phase11-api.pid
+          for attempt in {1..60}; do curl -fsS http://127.0.0.1:3000/api/v1/health/ready >/dev/null && exit 0; sleep 2; done
+          cat phase11-api.log
+          exit 1
+      - run: node backend/test/phase11-risk-matrix.integration.mjs | tee phase11-risk-matrix.log
+      - name: Stop backend
+        if: always()
+        run: if [ -f phase11-api.pid ]; then kill "$(cat phase11-api.pid)" 2>/dev/null || true; fi
+
+  browser-resilience:
+    name: Playwright Offline and Recovery UX
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Install portals and Chromium
+        run: |
+          npm ci
+          npm --prefix frontend-user ci
+          npm --prefix frontend-admin ci
+          npm --prefix mock-api ci
+          npm install --no-save --ignore-scripts @playwright/test@1.54.2
+          npx playwright install --with-deps chromium
+      - name: Start portals
+        run: |
+          npm --prefix mock-api run start > phase11-mock.log 2>&1 & echo $! > phase11-mock.pid
+          VITE_APP_ENV=test VITE_APP_URL=http://127.0.0.1:5173 VITE_API_BASE_URL=http://127.0.0.1:3001/api/v1 VITE_USE_MOCK_API=true npm --prefix frontend-user run dev > phase11-user.log 2>&1 & echo $! > phase11-user.pid
+          VITE_APP_ENV=test VITE_APP_URL=http://127.0.0.1:5174 VITE_API_BASE_URL=http://127.0.0.1:3001/api/v1 VITE_USE_MOCK_API=true npm --prefix frontend-admin run dev > phase11-admin.log 2>&1 & echo $! > phase11-admin.pid
+          for port in 3001 5173 5174; do for attempt in {1..60}; do nc -z 127.0.0.1 "$port" && break; sleep 2; done; nc -z 127.0.0.1 "$port"; done
+      - name: Run resilience browser tests
+        env:
+          PHASE11_USER_URL: http://127.0.0.1:5173
+          PHASE11_ADMIN_URL: http://127.0.0.1:5174
+        run: npm run test:phase11:browser
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase11-browser-evidence
+          path: |
+            playwright-report/phase11/
+            test-results/phase11-playwright/
+            phase11-*.log
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Stop portals
+        if: always()
+        run: for file in phase11-user.pid phase11-admin.pid phase11-mock.pid; do if [ -f "$file" ]; then kill "$(cat "$file")" 2>/dev/null || true; fi; done
