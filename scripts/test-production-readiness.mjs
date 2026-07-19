@@ -14,10 +14,11 @@ const files = {
   backend: join(envDir, 'backend.env'),
   database: join(envDir, 'database.env'),
 };
+const fixtureDbCredential = 'FixtureDatabasePassword123';
 
 writeFileSync(files.production, 'APP_VERSION=1.0.0\nUSER_DOMAIN=customer.dl247.test\nADMIN_DOMAIN=admin.dl247.test\n', { mode: 0o600 });
 writeFileSync(files.backend, [
-  'DATABASE_URL=mysql://dl247:FixtureDatabasePassword123@db:3306/dien_lanh_247',
+  `DATABASE_URL=mysql://dl247:${fixtureDbCredential}@db:3306/dien_lanh_247`,
   'JWT_ACCESS_SECRET=fixture_access_secret_0123456789_abcdef',
   'JWT_REFRESH_SECRET=fixture_refresh_secret_0123456789_abcdef',
   'AUDIT_LOG_HASH_SALT=fixture_audit_secret_0123456789_abcdef',
@@ -39,7 +40,7 @@ writeFileSync(files.backend, [
 writeFileSync(files.database, [
   'MYSQL_DATABASE=dien_lanh_247',
   'MYSQL_USER=dl247_app',
-  'MYSQL_PASSWORD=FixtureDatabasePassword123',
+  `MYSQL_PASSWORD=${fixtureDbCredential}`,
   'MYSQL_ROOT_PASSWORD=FixtureRootPassword12345',
   '',
 ].join('\n'), { mode: 0o600 });
