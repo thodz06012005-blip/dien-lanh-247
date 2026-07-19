@@ -7,16 +7,18 @@
 
 ## 1. Kết quả kỹ thuật
 
-| Cổng | Bằng chứng | Trạng thái trước khi mở PR |
+| Cổng | Bằng chứng | Trạng thái hiện tại |
 |---|---|---|
-| Lint, typecheck, unit | Root scripts + unit upload/provider failure | Local PASS; chờ CI độc lập |
-| Integration/API | Phase 15 critical flow + Phase 11 risk matrix | Chờ MySQL CI (máy local không có Docker/MySQL) |
-| Architecture/Mock API | Phase 1–12 inherited contracts | Local PASS; chờ CI độc lập |
-| Playwright | Responsive matrix + offline/recovery banners | Chờ browser CI |
-| Production build | Customer, admin, backend | Local PASS; chờ CI độc lập |
-| Backup/restore | Encrypted near-production Docker drill | Kế thừa workflow Phase 15; phải chạy lại trên head cuối |
+| Lint, typecheck, unit | Root scripts + unit upload/provider failure | PASS — Actions run `29679961499` |
+| Integration/API | Phase 15 critical flow + Phase 11 risk matrix | PASS — Actions runs `29679961499`, `29679961508` |
+| Architecture/Mock API | Phase 1–12 inherited contracts | PASS — Actions run `29679961499` |
+| Playwright | Responsive matrix + offline/recovery banners | PASS — Actions runs `29679961499`, `29679961508` |
+| Production build | Customer, admin, backend | PASS — Actions run `29679961508` |
+| Backup/restore | Encrypted near-production Docker drill | PASS — Actions run `29679961508` |
 | UAT người thật | Ba vai trò, không hướng dẫn từng nút | Chưa ký |
 | Go-live configuration | Domain, CA TLS, secrets, SMTP, storage, alert, schedule, DB | Chưa có production credentials |
+
+Head kỹ thuật được kiểm chứng: `661d163463fa2343eed304bd5bad119e2158092e`; 8/8 workflow trên PR #7 hoàn tất thành công ngày 2026-07-19.
 
 ## 2. Ma trận rủi ro bắt buộc
 
