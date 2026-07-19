@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AppErrorBoundary from '@/components/errors/AppErrorBoundary';
 import LightweightToastProvider from '@/components/feedback/LightweightToastProvider';
+import ConnectivityBanner from '@/components/feedback/ConnectivityBanner';
 
 interface AppProvidersProps {
   children: ReactNode;
@@ -36,7 +37,10 @@ export default function AppProviders({ children }: AppProvidersProps) {
   return (
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <LightweightToastProvider>{children}</LightweightToastProvider>
+        <LightweightToastProvider>
+          <ConnectivityBanner />
+          {children}
+        </LightweightToastProvider>
       </QueryClientProvider>
     </AppErrorBoundary>
   );

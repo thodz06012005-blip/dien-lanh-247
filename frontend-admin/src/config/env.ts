@@ -44,6 +44,9 @@ const serviceOnlyMode = readBoolean(import.meta.env.VITE_SERVICE_ONLY_MODE, true
 if (appEnvironment === 'production' && !serviceOnlyMode) {
   throw new Error('VITE_SERVICE_ONLY_MODE must be true in production.');
 }
+if (appEnvironment === 'production' && readBoolean(useMockValue, true)) {
+  throw new Error('VITE_USE_MOCK_API must be false in production.');
+}
 
 export const env = Object.freeze({
   appName: import.meta.env.VITE_APP_NAME?.trim() || 'Điện Lạnh 247 - Admin',

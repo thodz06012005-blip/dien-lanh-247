@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import AppErrorBoundary from '@/components/errors/AppErrorBoundary';
+import ConnectivityBanner from '@/components/feedback/ConnectivityBanner';
 import { AdminToastProvider } from '@/design-system';
 
 interface AppProvidersProps {
@@ -56,7 +57,10 @@ export default function AppProviders({ children }: AppProvidersProps) {
             },
           }}
         >
-          <AdminToastProvider>{children}</AdminToastProvider>
+          <AdminToastProvider>
+            <ConnectivityBanner />
+            {children}
+          </AdminToastProvider>
         </ConfigProvider>
       </QueryClientProvider>
     </AppErrorBoundary>
