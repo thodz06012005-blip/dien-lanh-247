@@ -35,6 +35,13 @@ test('Phase 11 risk matrix covers the required failure modes and three roles', (
   assert.match(upload, /oversized image/);
 });
 
+test('Phase 11 adds STAFF to MySQL with an additive enum migration', () => {
+  const migration = read('backend/prisma/migrations/20260719100000_phase11_staff_role/migration.sql');
+  assert.match(migration, /ALTER TABLE `User`/);
+  assert.match(migration, /'CUSTOMER', 'STAFF', 'ADMIN', 'SUPERADMIN'/);
+  assert.doesNotMatch(migration, /\bDROP\b/i);
+});
+
 test('production frontends fail closed when Mock API is enabled', () => {
   for (const path of ['frontend-user/src/config/env.ts', 'frontend-admin/src/config/env.ts']) {
     const source = read(path);

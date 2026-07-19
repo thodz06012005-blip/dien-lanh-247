@@ -65,9 +65,19 @@ jobs:
           npm run typecheck
           npm run test:unit
           npm run test:architecture
-          npm run test:mock
           npm run test:production-readiness-config
           npm run build:all
+      - name: Mock API service-only contract
+        run: |
+          ENABLE_DEV_ENDPOINTS=true ENABLE_DEMO_ACCOUNTS=true npm --prefix mock-api run start > phase11-quality-mock.log 2>&1 & echo $! > phase11-quality-mock.pid
+          for attempt in {1..60}; do nc -z 127.0.0.1 3001 && break; sleep 1; done
+          nc -z 127.0.0.1 3001
+          ENABLE_DEV_ENDPOINTS=true ENABLE_DEMO_ACCOUNTS=true npm run test:mock
+      - name: Reset and stop quality Mock API
+        if: always()
+        run: |
+          npm --prefix mock-api run reset-db || true
+          if [ -f phase11-quality-mock.pid ]; then kill "$(cat phase11-quality-mock.pid)" 2>/dev/null || true; fi
       - name: Confirm unsigned release is blocked
         run: if npm run test:release-gate; then echo 'Unsigned release was accepted'; exit 1; else echo 'Unsigned release correctly blocked'; fi
 
