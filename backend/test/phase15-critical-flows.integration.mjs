@@ -103,7 +103,9 @@ const bookingPayload = {
   customerPhone,
   customerEmail,
   customerAddress: '12 Trần Thái Tông',
+  province: 'Hà Nội',
   district: 'Quận Cầu Giấy',
+  ward: 'Dịch Vọng',
   serviceCategoryId: category.id,
   applianceType: 'Điều hòa treo tường',
   issueDescription:
@@ -112,6 +114,10 @@ const bookingPayload = {
   preferredTimeSlot: '08:00 - 10:00',
   priority: 'medium',
   note: 'E2E production acceptance flow',
+  contactConsent: true,
+  dataProcessingConsent: true,
+  termsAccepted: true,
+  termsVersion: 'DL247-SVC-1.0',
   pricingDisclosureAccepted: true,
   pricingDisclosureVersion: '2026-07-v1',
 };

@@ -187,12 +187,18 @@ async function runTests() {
     customerName: 'Customer 2',
     customerPhone: '0911111111',
     customerAddress: '123 Test St',
+    province: 'Hà Nội',
     district: 'Quận Cầu Giấy',
+    ward: 'Dịch Vọng',
     serviceCategoryId: 've-sinh-dieu-hoa',
     applianceType: 'Điều hòa',
     issueDescription: 'Vệ sinh máy',
     preferredDate: getFutureDate(7),
     preferredTimeSlot: '10:00 - 12:00',
+    contactConsent: true,
+    dataProcessingConsent: true,
+    termsAccepted: true,
+    termsVersion: 'DL247-SVC-1.0',
     pricingDisclosureAccepted: true,
     pricingDisclosureVersion: '2026-07-v1'
   });

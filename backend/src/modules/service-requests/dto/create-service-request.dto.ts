@@ -36,9 +36,19 @@ export class CreateServiceRequestDto {
   customerAddress: string;
 
   @IsString()
+  @IsNotEmpty({ message: 'Tỉnh hoặc thành phố là bắt buộc' })
+  @MaxLength(120)
+  province: string;
+
+  @IsString()
   @IsNotEmpty({ message: 'Quận hoặc huyện là bắt buộc' })
   @MaxLength(120)
   district: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Phường hoặc xã là bắt buộc' })
+  @MaxLength(120)
+  ward: string;
 
   @IsString()
   @IsNotEmpty({ message: 'Dịch vụ là bắt buộc' })
@@ -49,6 +59,16 @@ export class CreateServiceRequestDto {
   @IsNotEmpty({ message: 'Loại thiết bị là bắt buộc' })
   @Length(2, 160, { message: 'Loại thiết bị phải có từ 2 đến 160 ký tự' })
   applianceType: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(120)
+  applianceBrand?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(160)
+  applianceModel?: string;
 
   @IsString()
   @IsNotEmpty({ message: 'Mô tả sự cố là bắt buộc' })
@@ -71,6 +91,37 @@ export class CreateServiceRequestDto {
   @IsOptional()
   @MaxLength(2000)
   note?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  accessNote?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  photoNote?: string;
+
+  @IsBoolean()
+  @Equals(true, { message: 'Bạn cần đồng ý để Điện Lạnh 247 liên hệ về yêu cầu này' })
+  contactConsent: boolean;
+
+  @IsBoolean()
+  @Equals(true, { message: 'Bạn cần đồng ý xử lý dữ liệu để gửi yêu cầu' })
+  dataProcessingConsent: boolean;
+
+  @IsBoolean()
+  @Equals(true, { message: 'Bạn cần đồng ý điều khoản đặt lịch' })
+  termsAccepted: boolean;
+
+  @IsString()
+  @Matches(/^DL247-SVC-1\.0$/, { message: 'Phiên bản điều khoản không hợp lệ' })
+  termsVersion: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(200)
+  companyWebsite?: string;
 
   @IsBoolean()
   @Equals(true, { message: 'Bạn cần xác nhận đã hiểu giá chỉ là tham khảo' })

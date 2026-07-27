@@ -88,6 +88,8 @@ export class ContentPayloadDto {
   @IsOptional() @IsDateString() startedAt?: string;
   @IsOptional() @IsDateString() completedAt?: string;
   @IsOptional() @IsString() result?: string;
+  @IsOptional() @IsString() @MaxLength(500) evidenceReference?: string;
+  @IsOptional() @Transform(booleanTransform) @IsBoolean() imageRightsConfirmed?: boolean;
 
   @IsOptional() @IsIn(['DRAFT', 'PUBLISHED', 'ARCHIVED']) status?: string;
   @IsOptional() @Transform(booleanTransform) @IsBoolean() isFeatured?: boolean;

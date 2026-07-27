@@ -92,8 +92,7 @@ async function ensureTestimonial(adminId: number) {
        isActive, sortOrder, publishedAt, updatedById, publishedById, version, createdAt, updatedAt)
      VALUES ('Nguyễn Minh Anh', 'Quản lý vận hành', 'Doanh nghiệp dịch vụ',
              'Đội ngũ xác nhận lịch rõ ràng, báo giá trước và cập nhật tiến độ đầy đủ.',
-             5, 'PUBLISHED', TRUE, TRUE, 10, NOW(3), ?, ?, 1, NOW(3), NOW(3))`,
-    adminId,
+             5, 'DRAFT', FALSE, TRUE, 10, NULL, ?, NULL, 1, NOW(3), NOW(3))`,
     adminId,
   );
   return Number((await one<{ id: bigint | number }>('SELECT LAST_INSERT_ID() AS id'))?.id ?? 0);

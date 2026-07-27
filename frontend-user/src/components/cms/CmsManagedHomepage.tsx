@@ -1,18 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Building2, Quote, Star } from 'lucide-react';
+import { ArrowRight, Building2, MapPin, Quote, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getSiteContent, type SiteBanner, type SiteContentBundle } from '@/services/contentApi';
-
-interface FallbackTestimonial {
-  name: string;
-  role: string;
-  rating: number;
-  quote: string;
-}
-
-interface CmsManagedHomepageProps {
-  fallbackTestimonials: FallbackTestimonial[];
-}
 
 const commerceCopy = /\b(?:sản phẩm|giỏ hàng|checkout|đơn hàng|giao hàng|đổi trả|hoàn trả|mua ngay|mua hàng|khuyến mãi|voucher|coupon|bán lẻ|retail)\b/i;
 
@@ -94,7 +83,7 @@ function CampaignBanner({ banner }: { banner: SiteBanner }) {
   );
 }
 
-export default function CmsManagedHomepage({ fallbackTestimonials }: CmsManagedHomepageProps) {
+export default function CmsManagedHomepage() {
   const query = useQuery({
     queryKey: ['site-content', 'home'],
     queryFn: async () => (await getSiteContent('home')).data,
@@ -103,14 +92,13 @@ export default function CmsManagedHomepage({ fallbackTestimonials }: CmsManagedH
   });
   const bundle: SiteContentBundle | undefined = query.data;
   const safeManagedTestimonials = bundle?.testimonials?.filter((item) => !containsCommerceCopy(item.quote, item.serviceTitle));
-  const testimonials = safeManagedTestimonials?.length
-    ? safeManagedTestimonials.map((item) => ({
+  const testimonials = safeManagedTestimonials?.map((item) => ({
         name: item.customerName,
         role: [item.customerTitle, item.company].filter(Boolean).join(' · ') || item.serviceTitle || 'Khách hàng Điện Lạnh 247',
         rating: Math.max(1, Math.min(5, Number(item.rating) || 5)),
         quote: item.quote,
-      }))
-    : fallbackTestimonials;
+      })) || [];
+  const projects = bundle?.projects || [];
   const safeBanners = bundle?.banners?.filter((item) => !containsCommerceCopy(item.eyebrow, item.title, item.subtitle, item.ctaLabel, item.secondaryCtaLabel)) || [];
   const campaign = safeBanners.find((item) => item.placement !== 'HOME_HERO') || safeBanners[0];
   const sections = bundle?.sections?.filter((item) => item.sectionKey.startsWith('HOME_') && item.sectionKey !== 'HOME_HERO' && !containsCommerceCopy(item.eyebrow, item.title, item.content)) || [];
@@ -129,31 +117,61 @@ export default function CmsManagedHomepage({ fallbackTestimonials }: CmsManagedH
         </section>
       ))}
 
-      <section className="py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-primary-600">Khách hàng chia sẻ</p>
-            <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl lg:text-4xl">Trải nghiệm được tạo nên từ những chi tiết nhỏ</h2>
+      {projects.length > 0 && (
+        <section className="bg-[#061527] py-20 text-white sm:py-24">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
+              <div className="max-w-2xl">
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300">Hồ sơ đã xác minh</p>
+                <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Dự án tiêu biểu đã xác minh</h2>
+                <p className="mt-4 text-sm leading-7 text-slate-300">Chỉ nội dung đã được quản trị xác nhận nguồn bằng chứng và quyền hình ảnh mới xuất hiện tại đây.</p>
+              </div>
+              <Link to="/projects" className="inline-flex items-center gap-2 text-sm font-black text-cyan-300">Xem tất cả dự án <ArrowRight className="h-4 w-4" /></Link>
+            </div>
+            <div className="mt-10 grid gap-6 lg:grid-cols-2">
+              {projects.slice(0, 4).map((project) => (
+                <Link key={project.id} to={`/projects/${project.slug}`} className="group overflow-hidden rounded-[2rem] border border-white/10 bg-white/5">
+                  {project.coverUrl && <img src={resolveMedia(project.coverUrl)} alt={project.coverAlt || project.title} width="900" height="560" loading="lazy" decoding="async" className="aspect-[16/10] w-full object-cover opacity-85 transition duration-500 group-hover:scale-[1.02] motion-reduce:transform-none" />}
+                  <div className="p-6 sm:p-7">
+                    <div className="flex items-center gap-2 text-xs font-bold text-cyan-200"><MapPin className="h-4 w-4" />{project.location || 'Khu vực đã xác minh'}</div>
+                    <h3 className="mt-3 text-xl font-black">{project.title}</h3>
+                    {project.excerpt && <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-300">{project.excerpt}</p>}
+                    <span className="mt-5 inline-flex items-center gap-2 text-sm font-black">Xem hồ sơ <ArrowRight className="h-4 w-4" /></span>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
-            {testimonials.slice(0, 6).map((item) => (
-              <figure key={`${item.name}-${item.quote}`} className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
-                <Quote aria-hidden="true" className="h-8 w-8 text-blue-100" />
-                <div role="img" className="mt-4 flex gap-1" aria-label={`${item.rating} trên 5 sao`}>
-                  {Array.from({ length: item.rating }).map((_, index) => (
-                    <Star key={index} aria-hidden="true" className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  ))}
-                </div>
-                <blockquote className="mt-4 text-sm leading-7 text-slate-700">“{item.quote}”</blockquote>
-                <figcaption className="mt-6 border-t border-slate-100 pt-5">
-                  <strong className="block text-sm font-black text-slate-950">{item.name}</strong>
-                  <span className="mt-1 block text-xs text-slate-500">{item.role}</span>
-                </figcaption>
-              </figure>
-            ))}
+        </section>
+      )}
+
+      {testimonials.length > 0 && (
+        <section className="py-20 sm:py-24">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-primary-600">Khách hàng chia sẻ</p>
+              <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl lg:text-4xl">Đánh giá đã được xác minh</h2>
+            </div>
+            <div className="mt-10 grid gap-6 md:grid-cols-3">
+              {testimonials.slice(0, 6).map((item) => (
+                <figure key={`${item.name}-${item.quote}`} className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+                  <Quote aria-hidden="true" className="h-8 w-8 text-blue-100" />
+                  <div role="img" className="mt-4 flex gap-1" aria-label={`${item.rating} trên 5 sao`}>
+                    {Array.from({ length: item.rating }).map((_, index) => (
+                      <Star key={index} aria-hidden="true" className="h-4 w-4 fill-amber-400 text-amber-400" />
+                    ))}
+                  </div>
+                  <blockquote className="mt-4 text-sm leading-7 text-slate-700">“{item.quote}”</blockquote>
+                  <figcaption className="mt-6 border-t border-slate-100 pt-5">
+                    <strong className="block text-sm font-black text-slate-950">{item.name}</strong>
+                    <span className="mt-1 block text-xs text-slate-500">{item.role}</span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {bundle?.partners?.length ? (
         <section className="border-y border-slate-100 bg-slate-50 py-12">

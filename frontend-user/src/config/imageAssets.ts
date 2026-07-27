@@ -23,6 +23,19 @@ const technicianHero = {
   fallbackSrc,
 };
 
+const diagnosticTeam = {
+  src: '/images/service/diagnostic-team-1672.webp',
+  srcSet: [
+    '/images/service/diagnostic-team-768.webp 768w',
+    '/images/service/diagnostic-team-1280.webp 1280w',
+    '/images/service/diagnostic-team-1672.webp 1672w',
+  ].join(', '),
+  width: 1672,
+  height: 941,
+  aspectRatio: '16 / 9' as const,
+  fallbackSrc,
+};
+
 export const imageAssets = {
   'home.hero': {
     ...technicianHero,
@@ -43,6 +56,11 @@ export const imageAssets = {
     ...technicianHero,
     alt: 'Kỹ thuật viên chẩn đoán tình trạng thiết bị tại địa điểm phục vụ',
     objectPosition: '70% center',
+  },
+  'service.diagnostic-team': {
+    ...diagnosticTeam,
+    alt: 'Kỹ thuật viên Điện Lạnh 247 kiểm tra điều hòa bằng thiết bị chẩn đoán',
+    objectPosition: '68% center',
   },
   'project.cover': {
     ...technicianHero,

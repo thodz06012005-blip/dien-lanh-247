@@ -342,9 +342,10 @@ export class EditorialCmsService {
       await this.prisma.$executeRawUnsafe(
         `INSERT INTO Testimonial
           (customerName, customerTitle, company, quote, rating, avatarMediaId, serviceId,
+           isVerified, verificationReference,
            status, isFeatured, isActive, sortOrder, publishedAt, updatedById, publishedById,
            version, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(3), NOW(3))`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(3), NOW(3))`,
         payload.customerName.trim(),
         payload.customerTitle ?? null,
         payload.company ?? null,
@@ -352,6 +353,8 @@ export class EditorialCmsService {
         payload.rating ?? 5,
         payload.avatarMediaId ?? null,
         payload.serviceId ?? null,
+        payload.isVerified ?? false,
+        payload.verificationReference ?? null,
         payload.status ?? 'DRAFT',
         payload.isFeatured ?? false,
         payload.isActive ?? true,
@@ -487,7 +490,7 @@ export class EditorialCmsService {
     const allowed: Record<string, string[]> = {
       banners: ['name','eyebrow','title','subtitle','ctaLabel','ctaUrl','secondaryCtaLabel','secondaryCtaUrl','placement','theme','desktopMediaId','mobileMediaId','status','isActive','sortOrder','publishedAt','startsAt','endsAt'],
       partners: ['name','description','websiteUrl','logoMediaId','status','isFeatured','isActive','sortOrder','publishedAt'],
-      testimonials: ['customerName','customerTitle','company','quote','rating','avatarMediaId','serviceId','status','isFeatured','isActive','sortOrder','publishedAt'],
+      testimonials: ['customerName','customerTitle','company','quote','rating','avatarMediaId','serviceId','isVerified','verificationReference','status','isFeatured','isActive','sortOrder','publishedAt'],
       'site-sections': ['sectionKey','name','eyebrow','title','content','config','status','isActive','sortOrder','publishedAt','seoTitle','seoDescription','canonicalUrl','socialImageMediaId'],
       authors: ['userId','displayName','roleTitle','bio','avatarMediaId','socialLinks','isActive'],
     };
@@ -525,6 +528,30 @@ export class EditorialCmsService {
     }
     const current = await this.find(type, identifier);
     const id = current.data.id;
+    if (
+      type === 'projects'
+      && (
+        current.data.imageRightsConfirmed !== true
+        || typeof current.data.evidenceReference !== 'string'
+        || !current.data.evidenceReference.trim()
+      )
+    ) {
+      throw new BadRequestException(
+        'Dự án cần bằng chứng và xác nhận quyền sử dụng ảnh trước khi xuất bản',
+      );
+    }
+    if (
+      type === 'testimonials'
+      && (
+        current.data.isVerified !== true
+        || typeof current.data.verificationReference !== 'string'
+        || !current.data.verificationReference.trim()
+      )
+    ) {
+      throw new BadRequestException(
+        'Đánh giá cần được xác minh và ghi nguồn đối chiếu trước khi xuất bản',
+      );
+    }
     const config = this.table(type);
     const activeAssignment = config.activeField ? `, ${config.activeField} = TRUE` : '';
     await this.prisma.$executeRawUnsafe(
@@ -676,7 +703,11 @@ export class EditorialCmsService {
              FROM Testimonial x
              LEFT JOIN Media m ON m.id = x.avatarMediaId
              LEFT JOIN Service s ON s.id = x.serviceId
-             WHERE ${nowClause} ORDER BY x.isFeatured DESC, x.sortOrder ASC`,
+             WHERE ${nowClause}
+               AND x.isVerified = TRUE
+               AND x.verificationReference IS NOT NULL
+               AND TRIM(x.verificationReference) <> ''
+             ORDER BY x.isFeatured DESC, x.sortOrder ASC`,
           ),
       this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
         `SELECT x.*, m.url AS socialImageUrl FROM SiteSection x

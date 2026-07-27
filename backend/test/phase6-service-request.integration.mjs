@@ -50,7 +50,9 @@ const createPayload = {
   customerPhone: '0912345678',
   customerEmail: 'phase6.customer@example.com',
   customerAddress: 'Số 12 đường Cầu Giấy, phường Dịch Vọng',
+  province: 'Hà Nội',
   district: 'Quận Cầu Giấy',
+  ward: 'Dịch Vọng',
   applianceType: 'Điều hòa Daikin Inverter 12000 BTU',
   serviceCategoryId: 'sua-dieu-hoa',
   issueDescription:
@@ -59,6 +61,10 @@ const createPayload = {
   preferredDate: '2027-01-15',
   preferredTimeSlot: '08:00 - 10:00',
   note: 'Gọi trước khi đến 30 phút.',
+  contactConsent: true,
+  dataProcessingConsent: true,
+  termsAccepted: true,
+  termsVersion: 'DL247-SVC-1.0',
   pricingDisclosureAccepted: true,
   pricingDisclosureVersion: '2026-07-v1',
 };

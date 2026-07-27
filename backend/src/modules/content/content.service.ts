@@ -141,6 +141,8 @@ export class ContentService {
     }
 
     if (type === 'projects') {
+      clauses.push('x.imageRightsConfirmed = TRUE');
+      clauses.push("x.evidenceReference IS NOT NULL AND TRIM(x.evidenceReference) <> ''");
       const where = `WHERE ${clauses.join(' AND ')}`;
       return this.paginate(
         `SELECT x.*, m.url AS coverUrl, m.altText AS coverAlt
@@ -199,6 +201,8 @@ export class ContentService {
         `SELECT x.*, m.url AS coverUrl, m.altText AS coverAlt
          FROM Project x LEFT JOIN Media m ON m.id = x.coverMediaId
          WHERE x.slug = ? AND x.status = 'PUBLISHED'
+           AND x.imageRightsConfirmed = TRUE
+           AND x.evidenceReference IS NOT NULL AND TRIM(x.evidenceReference) <> ''
            AND (x.publishedAt IS NULL OR x.publishedAt <= NOW()) LIMIT 1`,
         slug,
       );
@@ -379,12 +383,14 @@ export class ContentService {
       await this.prisma.$executeRawUnsafe(
         `INSERT INTO Project
         (title, slug, excerpt, clientName, location, startedAt, completedAt, tasks, content, result,
-         status, isFeatured, sortOrder, publishedAt, seoTitle, seoDescription, coverMediaId, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
+         evidenceReference, imageRightsConfirmed, status, isFeatured, sortOrder, publishedAt,
+         seoTitle, seoDescription, coverMediaId, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
         payload.title, slug, payload.excerpt ?? null, payload.clientName ?? null, payload.location ?? null,
         payload.startedAt ? new Date(payload.startedAt) : null,
         payload.completedAt ? new Date(payload.completedAt) : null,
         this.json(payload.tasks), payload.content ?? null, payload.result ?? null,
+        payload.evidenceReference ?? null, payload.imageRightsConfirmed ?? false,
         payload.status ?? 'DRAFT', payload.isFeatured ?? false, payload.sortOrder ?? 0,
         payload.publishedAt ? new Date(payload.publishedAt) : null,
         payload.seoTitle ?? null, payload.seoDescription ?? null, payload.coverMediaId ?? null,
@@ -458,7 +464,7 @@ export class ContentService {
     const allowed: Record<ContentType, string[]> = {
       services: ['title','slug','excerpt','content','pricing','process','warranty','faq','relatedServiceSlugs','status','isFeatured','sortOrder','publishedAt','seoTitle','seoDescription','serviceCategoryId','coverMediaId'],
       'service-categories': ['name','slug','description','summary','coverMediaId','isActive','isFeatured','sortOrder','seoTitle','seoDescription'],
-      projects: ['title','slug','excerpt','clientName','location','startedAt','completedAt','tasks','content','result','status','isFeatured','sortOrder','publishedAt','seoTitle','seoDescription','coverMediaId'],
+      projects: ['title','slug','excerpt','clientName','location','startedAt','completedAt','tasks','content','result','evidenceReference','imageRightsConfirmed','status','isFeatured','sortOrder','publishedAt','seoTitle','seoDescription','coverMediaId'],
       posts: ['title','slug','excerpt','content','status','isFeatured','publishedAt','seoTitle','seoDescription','canonicalUrl','categoryId','authorId','coverMediaId'],
       categories: ['name','slug','description','isActive','sortOrder','seoTitle','seoDescription'],
       tags: ['name','slug','description','isActive'],

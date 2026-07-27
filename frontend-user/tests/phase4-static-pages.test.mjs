@@ -79,10 +79,10 @@ test('optimized images reserve space and support responsive lazy loading', () =>
 
 test('homepage includes all required business sections and contact form', () => {
   const home = read('src/pages/Home.tsx');
+  const managed = read('src/components/cms/CmsManagedHomepage.tsx');
   for (const marker of [
     'Dịch vụ nổi bật',
     'Về Điện Lạnh 247',
-    'Dự án tiêu biểu',
     'Lý do lựa chọn',
     'Quy trình phục vụ',
     'Góc kiến thức',
@@ -91,6 +91,8 @@ test('homepage includes all required business sections and contact form', () => 
     assert.match(home, new RegExp(marker), `Homepage missing section: ${marker}`);
   }
   assert.match(home, /QuickContactForm/);
+  assert.match(managed, /Dự án tiêu biểu đã xác minh/);
+  assert.match(managed, /projects\.length > 0/);
   assert.match(
     home,
     /CmsManagedHomepage|Khách hàng chia sẻ/,

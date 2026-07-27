@@ -68,12 +68,23 @@ const populateTechnician = (request, db) => {
 router.post('/service-requests', (req, res) => {
   const db = readDB();
   const body = req.body;
+  if (String(body.companyWebsite || '').trim()) {
+    return respondError(res, 400, 'Không thể tiếp nhận yêu cầu', 'INVALID_SUBMISSION');
+  }
   const idempotencyKey = String(req.get('Idempotency-Key') || '').trim();
   if (idempotencyKey && (idempotencyKey.length < 8 || idempotencyKey.length > 200)) {
     return respondError(res, 400, 'Idempotency-Key phải có từ 8 đến 200 ký tự', 'INVALID_IDEMPOTENCY_KEY');
   }
   if (body.pricingDisclosureAccepted !== true || body.pricingDisclosureVersion !== '2026-07-v1') {
     return respondError(res, 400, 'Cần xác nhận thông tin giá tham khảo', 'PRICING_DISCLOSURE_REQUIRED');
+  }
+  if (
+    body.contactConsent !== true
+    || body.dataProcessingConsent !== true
+    || body.termsAccepted !== true
+    || body.termsVersion !== 'DL247-SVC-1.0'
+  ) {
+    return respondError(res, 400, 'Cần đồng ý liên hệ, xử lý dữ liệu và điều khoản đặt lịch', 'CONSENT_REQUIRED');
   }
   const fingerprint = createHash('sha256').update(JSON.stringify(body)).digest('hex');
   const keyHash = idempotencyKey ? createHash('sha256').update(idempotencyKey).digest('hex') : null;
@@ -99,7 +110,9 @@ router.post('/service-requests', (req, res) => {
     'customerName',
     'customerPhone',
     'customerAddress',
+    'province',
     'district',
+    'ward',
     'serviceCategoryId',
     'applianceType',
     'issueDescription',
@@ -116,7 +129,9 @@ router.post('/service-requests', (req, res) => {
   const customerName = body.customerName.trim();
   const customerPhone = body.customerPhone.replace(/\s+/g, '').trim();
   const customerAddress = body.customerAddress.trim();
+  const province = body.province.trim();
   const district = body.district.trim();
+  const ward = body.ward.trim();
   const serviceCategoryId = body.serviceCategoryId.trim();
   const applianceType = body.applianceType.trim();
   const issueDescription = body.issueDescription.trim();
@@ -126,6 +141,9 @@ router.post('/service-requests', (req, res) => {
   // 2. Validate customerPhone (basic Vietnamese phone number format)
   if (!isValidPhone(customerPhone)) {
     return respondError(res, 400, 'Số điện thoại không hợp lệ', 'INVALID_PHONE');
+  }
+  if (province.toLocaleLowerCase('vi-VN') !== 'hà nội') {
+    return respondError(res, 400, 'Khu vực này chưa nằm trong phạm vi điều phối trực tuyến', 'UNSUPPORTED_SERVICE_AREA');
   }
 
   // 3. Validate serviceCategoryId exists in db.serviceCategories
@@ -165,20 +183,29 @@ router.post('/service-requests', (req, res) => {
     customerName,
     customerPhone,
     customerAddress,
+    province,
     district: districtNormalized,
+    ward,
     serviceCategoryId,
     applianceType,
+    applianceBrand: String(body.applianceBrand || '').trim() || null,
+    applianceModel: String(body.applianceModel || '').trim() || null,
     issueDescription,
     images: body.images || [],
     preferredDate,
     preferredTimeSlot,
     note: body.note || '',
+    accessNote: String(body.accessNote || '').trim() || null,
+    photoNote: String(body.photoNote || '').trim() || null,
     status: 'pending',
     workflowStatus: 'NEW',
     requestVersion: 1,
     customerEmail: String(body.customerEmail || '').trim().toLowerCase(),
     pricingDisclosureVersion: body.pricingDisclosureVersion,
     pricingDisclosureAcceptedAt: now,
+    contactConsentAt: now,
+    dataProcessingConsentAt: now,
+    termsAcceptedVersion: body.termsVersion,
     referencePriceMinSnapshot: category.referencePriceMin || 150000,
     referencePriceMaxSnapshot: category.referencePriceMax || 650000,
     surveyFeeSnapshot: category.surveyFee || 100000,
