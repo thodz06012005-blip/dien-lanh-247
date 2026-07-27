@@ -418,14 +418,20 @@ model ServiceRequest {
   customerName                String
   customerPhone               String
   customerAddress             String
+  province                    String                 @default("Hà Nội") @db.VarChar(120)
   district                    String
+  ward                        String?                @db.VarChar(120)
   priority                    ServiceRequestPriority @default(medium)
   applianceType               String
+  applianceBrand              String?                @db.VarChar(120)
+  applianceModel              String?                @db.VarChar(160)
   issueDescription            String                 @db.Text
   images                      Json? // Array of image URLs
   preferredDate               String // e.g. "2026-07-05"
   preferredTimeSlot           String // e.g. "08:00 - 10:00"
   note                        String?                @db.Text
+  accessNote                  String?                @db.VarChar(500)
+  photoNote                   String?                @db.VarChar(500)
   status                      ServiceRequestStatus   @default(pending)
   estimatedPrice              Decimal                @default(0) @db.Decimal(12, 2)
   finalPrice                  Decimal                @default(0) @db.Decimal(12, 2)
@@ -446,6 +452,9 @@ model ServiceRequest {
   customerUserId              Int?
   pricingDisclosureVersion    String                 @default("2026-07-v1") @db.VarChar(32)
   pricingDisclosureAcceptedAt DateTime?
+  contactConsentAt            DateTime?
+  dataProcessingConsentAt     DateTime?
+  termsAcceptedVersion        String?                @db.VarChar(32)
   referencePriceMinSnapshot   Decimal?               @db.Decimal(12, 2)
   referencePriceMaxSnapshot   Decimal?               @db.Decimal(12, 2)
   surveyFeeSnapshot           Decimal                @default(0) @db.Decimal(12, 2)

@@ -54,6 +54,8 @@ export interface ManagedProject extends EditorialSeoFields {
   tasks?: string[];
   content?: string;
   result?: string;
+  evidenceReference?: string;
+  imageRightsConfirmed?: boolean;
   coverUrl?: string;
   coverAlt?: string;
   album?: MediaAsset[];

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   CalendarDays,
@@ -31,6 +31,10 @@ import useDocumentTitle from '../hooks/useDocumentTitle';
 import { DISTRICT_OPTIONS } from '../constants/areas';
 
 const TIME_SLOTS = ['08:00 - 10:00', '10:00 - 12:00', '14:00 - 16:00', '16:00 - 18:00'];
+const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+const SUPPORTED_IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const;
+const MAX_DESCRIPTION_LENGTH = 3000;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const PRIORITIES: Array<{ value: ServiceRequestPriority; label: string; description: string }> = [
   { value: 'low', label: 'Thông thường', description: 'Thiết bị vẫn có thể sử dụng' },
   { value: 'medium', label: 'Cần xử lý sớm', description: 'Ảnh hưởng sinh hoạt hằng ngày' },
@@ -43,14 +47,21 @@ interface BookingForm {
   customerPhone: string;
   customerEmail: string;
   customerAddress: string;
+  province: string;
   district: string;
+  ward: string;
   applianceType: string;
+  applianceBrand: string;
+  applianceModel: string;
   serviceCategoryId: string;
   issueDescription: string;
   priority: ServiceRequestPriority;
   preferredDate: string;
   preferredTimeSlot: string;
   note: string;
+  accessNote: string;
+  photoNote: string;
+  companyWebsite: string;
 }
 
 const steps = [
@@ -63,26 +74,37 @@ const steps = [
 export default function ServiceBooking() {
   useDocumentTitle('Đặt lịch sửa chữa', 'Gửi yêu cầu sửa chữa điện lạnh và nhận mã tra cứu ngay lập tức.');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
   const { showError } = useToastStore();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [pricingAccepted, setPricingAccepted] = useState(false);
+  const [contactConsent, setContactConsent] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [dataProcessingConsent, setDataProcessingConsent] = useState(false);
   const idempotencyKeyRef = useRef<string | null>(null);
   const [form, setForm] = useState<BookingForm>({
     customerName: '',
     customerPhone: '',
     customerEmail: '',
     customerAddress: '',
+    province: 'Hà Nội',
     district: '',
+    ward: '',
     applianceType: '',
+    applianceBrand: '',
+    applianceModel: '',
     serviceCategoryId: '',
     issueDescription: '',
     priority: 'medium',
     preferredDate: '',
     preferredTimeSlot: '',
     note: '',
+    accessNote: '',
+    photoNote: '',
+    companyWebsite: '',
   });
 
   useEffect(() => {
@@ -101,7 +123,19 @@ export default function ServiceBooking() {
     queryKey: ['service-categories'],
     queryFn: async () => (await api.get('/service-categories')).data,
   });
-  const categories: ServiceCategory[] = categoriesData?.data || [];
+  const categories = useMemo<ServiceCategory[]>(
+    () => categoriesData?.data || [],
+    [categoriesData],
+  );
+  const requestedService = searchParams.get('service')?.trim() || '';
+
+  useEffect(() => {
+    if (!requestedService || form.serviceCategoryId || categories.length === 0) return;
+    const category = categories.find(
+      (item) => item.id === requestedService || item.slug === requestedService,
+    );
+    if (category) setForm((current) => ({ ...current, serviceCategoryId: category.id }));
+  }, [categories, form.serviceCategoryId, requestedService]);
 
   const previews = useMemo(
     () => files.map((file) => ({ file, url: URL.createObjectURL(file) })),
@@ -113,8 +147,14 @@ export default function ServiceBooking() {
   );
 
   const today = useMemo(() => {
-    const date = new Date();
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: VIETNAM_TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date());
+    const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${value.year}-${value.month}-${value.day}`;
   }, []);
 
   const set = (key: keyof BookingForm, value: string) => {
@@ -131,6 +171,14 @@ export default function ServiceBooking() {
         showError('Email chưa đúng định dạng.');
         return false;
       }
+      if (!/^(?:\+?84|0)(?:3|5|7|8|9)\d{8}$/.test(form.customerPhone.replace(/\s+/g, ''))) {
+        showError('Số điện thoại Việt Nam chưa đúng định dạng.');
+        return false;
+      }
+      if (!contactConsent) {
+        showError('Vui lòng đồng ý để Điện Lạnh 247 liên hệ về yêu cầu này.');
+        return false;
+      }
     }
     if (currentStep === 2) {
       if (!form.serviceCategoryId || !form.applianceType.trim()) {
@@ -141,9 +189,13 @@ export default function ServiceBooking() {
         showError('Mô tả sự cố cần có ít nhất 10 ký tự.');
         return false;
       }
+      if (form.issueDescription.length > MAX_DESCRIPTION_LENGTH) {
+        showError(`Mô tả sự cố không được vượt quá ${MAX_DESCRIPTION_LENGTH} ký tự.`);
+        return false;
+      }
     }
     if (currentStep === 3) {
-      if (!form.customerAddress.trim() || !form.district) {
+      if (!form.customerAddress.trim() || !form.province || !form.district || !form.ward.trim()) {
         showError('Vui lòng nhập đầy đủ địa chỉ phục vụ.');
         return false;
       }
@@ -159,21 +211,51 @@ export default function ServiceBooking() {
     if (validateStep(step)) setStep((value) => Math.min(4, value + 1));
   };
 
-  const handleFiles = (selected: FileList | null) => {
+  const detectImageMime = async (file: File) => {
+    const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+    if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'image/png';
+    if (
+      String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF'
+      && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP'
+    ) return 'image/webp';
+    return null;
+  };
+
+  const handleFiles = async (selected: FileList | null) => {
     if (!selected) return;
-    const incoming = Array.from(selected).filter((file) => file.type.startsWith('image/'));
-    const oversized = incoming.find((file) => file.size > 5 * 1024 * 1024);
+    const incoming = Array.from(selected);
+    if (files.length + incoming.length > 5) {
+      showError('Mỗi yêu cầu chỉ được tải tối đa 5 ảnh.');
+      return;
+    }
+    const oversized = incoming.find((file) => file.size > MAX_IMAGE_BYTES);
     if (oversized) {
       showError(`Ảnh ${oversized.name} vượt quá 5 MB.`);
       return;
     }
-    setFiles((current) => [...current, ...incoming].slice(0, 5));
+    for (const file of incoming) {
+      const detectedMime = await detectImageMime(file);
+      if (!detectedMime || !SUPPORTED_IMAGE_MIME.includes(detectedMime)) {
+        showError(`Tệp ${file.name} không phải ảnh JPG, PNG hoặc WebP hợp lệ.`);
+        return;
+      }
+      if (file.type && file.type !== detectedMime) {
+        showError(`Định dạng khai báo của ${file.name} không khớp nội dung tệp.`);
+        return;
+      }
+    }
+    setFiles((current) => [...current, ...incoming]);
   };
 
   const submit = async () => {
     if (!validateStep(1) || !validateStep(2) || !validateStep(3)) return;
     if (!pricingAccepted) {
       showError('Vui lòng xác nhận đã hiểu giá hiển thị chỉ là tham khảo.');
+      return;
+    }
+    if (!termsAccepted || !dataProcessingConsent) {
+      showError('Vui lòng đồng ý điều khoản đặt lịch và xử lý dữ liệu.');
       return;
     }
     setIsSubmitting(true);
@@ -186,9 +268,20 @@ export default function ServiceBooking() {
         customerPhone: phone,
         customerEmail: form.customerEmail.trim().toLowerCase(),
         customerAddress: form.customerAddress.trim(),
+        province: form.province,
+        ward: form.ward.trim(),
+        applianceBrand: form.applianceBrand.trim() || undefined,
+        applianceModel: form.applianceModel.trim() || undefined,
         applianceType: form.applianceType.trim(),
         issueDescription: form.issueDescription.trim(),
         note: form.note.trim(),
+        accessNote: form.accessNote.trim() || undefined,
+        photoNote: form.photoNote.trim() || undefined,
+        companyWebsite: form.companyWebsite,
+        contactConsent: true,
+        dataProcessingConsent: true,
+        termsAccepted: true,
+        termsVersion: 'DL247-SVC-1.0',
         pricingDisclosureAccepted: true,
         pricingDisclosureVersion: '2026-07-v1',
       }, idempotencyKeyRef.current);
@@ -288,10 +381,18 @@ export default function ServiceBooking() {
               <div className="space-y-6">
                 <div><p className="text-xs font-black uppercase tracking-[0.16em] text-primary-700">Bước 1</p><h2 id="booking-step-1" className="mt-2 text-2xl font-black text-slate-950">Thông tin liên hệ</h2><p className="mt-2 text-sm text-slate-600">Thông tin này chỉ dùng để xác nhận và điều phối kỹ thuật viên.</p></div>
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Input label="Họ và tên *" value={form.customerName} onChange={(event) => set('customerName', event.target.value)} placeholder="Nguyễn Văn A" leftIcon={<UserRound aria-hidden="true" className="h-4 w-4" />} />
-                  <Input label="Số điện thoại *" value={form.customerPhone} onChange={(event) => set('customerPhone', event.target.value)} placeholder="0912345678" leftIcon={<Phone aria-hidden="true" className="h-4 w-4" />} />
-                  <Input label="Email nhận xác nhận *" type="email" value={form.customerEmail} onChange={(event) => set('customerEmail', event.target.value)} placeholder="ban@example.com" leftIcon={<Mail aria-hidden="true" className="h-4 w-4" />} />
+                  <Input label="Họ và tên *" autoComplete="name" value={form.customerName} onChange={(event) => set('customerName', event.target.value)} placeholder="Nguyễn Văn A" leftIcon={<UserRound aria-hidden="true" className="h-4 w-4" />} />
+                  <Input label="Số điện thoại *" type="tel" inputMode="tel" autoComplete="tel" value={form.customerPhone} onChange={(event) => set('customerPhone', event.target.value)} placeholder="0912345678" leftIcon={<Phone aria-hidden="true" className="h-4 w-4" />} />
+                  <Input label="Email nhận xác nhận *" type="email" autoComplete="email" value={form.customerEmail} onChange={(event) => set('customerEmail', event.target.value)} placeholder="ban@example.com" leftIcon={<Mail aria-hidden="true" className="h-4 w-4" />} />
                 </div>
+                <div className="absolute -left-[10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
+                  <label htmlFor="booking-company-website">Website công ty</label>
+                  <input id="booking-company-website" tabIndex={-1} autoComplete="off" value={form.companyWebsite} onChange={(event) => set('companyWebsite', event.target.value)} />
+                </div>
+                <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
+                  <input type="checkbox" checked={contactConsent} onChange={(event) => setContactConsent(event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+                  <span>Tôi đồng ý để Điện Lạnh 247 liên hệ qua điện thoại hoặc email nhằm xác nhận và xử lý yêu cầu này. Việc gửi form không cho biết email/số điện thoại đã có tài khoản hay chưa.</span>
+                </label>
               </div>
             )}
 
@@ -300,9 +401,16 @@ export default function ServiceBooking() {
                 <div><p className="text-xs font-black uppercase tracking-[0.16em] text-primary-700">Bước 2</p><h2 id="booking-step-2" className="mt-2 text-2xl font-black text-slate-950">Thiết bị và sự cố</h2><p className="mt-2 text-sm text-slate-600">Mô tả càng rõ, kỹ thuật viên chuẩn bị dụng cụ càng chính xác.</p></div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5"><label htmlFor="booking-service" className="text-sm font-semibold text-slate-700">Dịch vụ *</label><select id="booking-service" value={form.serviceCategoryId} onChange={(event) => set('serviceCategoryId', event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10"><option value="">Chọn dịch vụ</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></div>
-                  <Input label="Loại thiết bị *" value={form.applianceType} onChange={(event) => set('applianceType', event.target.value)} placeholder="Điều hòa Daikin 12000 BTU" />
+                  <Input label="Loại thiết bị *" value={form.applianceType} onChange={(event) => set('applianceType', event.target.value)} placeholder="Điều hòa treo tường" />
                 </div>
-                <div><label htmlFor="booking-issue" className="text-sm font-semibold text-slate-700">Mô tả sự cố *</label><textarea id="booking-issue" value={form.issueDescription} onChange={(event) => set('issueDescription', event.target.value)} rows={5} placeholder="Thiết bị có biểu hiện gì, xuất hiện từ khi nào..." className="mt-1.5 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm leading-6 outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10" /></div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Input label="Hãng (không bắt buộc)" value={form.applianceBrand} onChange={(event) => set('applianceBrand', event.target.value)} placeholder="Daikin, Panasonic..." />
+                  <Input label="Model (không bắt buộc)" value={form.applianceModel} onChange={(event) => set('applianceModel', event.target.value)} placeholder="Để trống nếu không biết" />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between gap-3"><label htmlFor="booking-issue" className="text-sm font-semibold text-slate-700">Mô tả sự cố *</label><span className="text-xs text-slate-500">{form.issueDescription.length}/{MAX_DESCRIPTION_LENGTH}</span></div>
+                  <textarea id="booking-issue" maxLength={MAX_DESCRIPTION_LENGTH} value={form.issueDescription} onChange={(event) => set('issueDescription', event.target.value)} rows={5} placeholder="Thiết bị có biểu hiện gì, xuất hiện từ khi nào..." className="mt-1.5 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm leading-6 outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10" />
+                </div>
                 <fieldset><legend className="text-sm font-semibold text-slate-700">Mức độ ưu tiên</legend><div className="mt-2 grid gap-3 sm:grid-cols-2">{PRIORITIES.map((priority) => <button key={priority.value} type="button" onClick={() => set('priority', priority.value)} aria-pressed={form.priority === priority.value} className={`rounded-2xl border p-4 text-left transition ${form.priority === priority.value ? 'border-primary-600 bg-primary-50 ring-4 ring-primary-500/10' : 'border-slate-200 hover:border-slate-300'}`}><strong className="block text-sm text-slate-900">{priority.label}</strong><span className="mt-1 block text-xs leading-5 text-slate-600">{priority.description}</span></button>)}</div></fieldset>
               </div>
             )}
@@ -310,8 +418,14 @@ export default function ServiceBooking() {
             {step === 3 && (
               <div className="space-y-6">
                 <div><p className="text-xs font-black uppercase tracking-[0.16em] text-primary-700">Bước 3</p><h2 id="booking-step-3" className="mt-2 text-2xl font-black text-slate-950">Địa chỉ và lịch mong muốn</h2><p className="mt-2 text-sm text-slate-600">Khung giờ là khoảng thời gian mong muốn và chỉ được chốt sau khi điều phối viên xác nhận.</p></div>
-                <div className="grid gap-4 sm:grid-cols-2"><div className="flex flex-col gap-1.5"><label htmlFor="booking-district" className="text-sm font-semibold text-slate-700">Quận/Huyện *</label><select id="booking-district" value={form.district} onChange={(event) => set('district', event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10"><option value="">Chọn khu vực</option>{DISTRICT_OPTIONS.map((area) => <option key={area.value} value={area.value}>{area.label}</option>)}</select></div><Input label="Địa chỉ chi tiết *" value={form.customerAddress} onChange={(event) => set('customerAddress', event.target.value)} placeholder="Số nhà, đường, phường/xã" leftIcon={<MapPin aria-hidden="true" className="h-4 w-4" />} /></div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="flex flex-col gap-1.5"><label htmlFor="booking-province" className="text-sm font-semibold text-slate-700">Tỉnh/Thành phố *</label><select id="booking-province" value={form.province} onChange={(event) => set('province', event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10"><option value="Hà Nội">Hà Nội</option></select></div>
+                  <div className="flex flex-col gap-1.5"><label htmlFor="booking-district" className="text-sm font-semibold text-slate-700">Quận/Huyện *</label><select id="booking-district" value={form.district} onChange={(event) => set('district', event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10"><option value="">Chọn khu vực</option>{DISTRICT_OPTIONS.map((area) => <option key={area.value} value={area.value}>{area.label}</option>)}</select></div>
+                  <Input label="Phường/Xã *" value={form.ward} onChange={(event) => set('ward', event.target.value)} placeholder="Ví dụ: Dịch Vọng" />
+                </div>
+                <Input label="Địa chỉ chi tiết *" autoComplete="street-address" value={form.customerAddress} onChange={(event) => set('customerAddress', event.target.value)} placeholder="Số nhà, ngõ, tên đường" leftIcon={<MapPin aria-hidden="true" className="h-4 w-4" />} />
                 <div className="grid gap-4 sm:grid-cols-2"><Input label="Ngày mong muốn *" type="date" min={today} value={form.preferredDate} onChange={(event) => set('preferredDate', event.target.value)} leftIcon={<CalendarDays aria-hidden="true" className="h-4 w-4" />} /><div className="flex flex-col gap-1.5"><label htmlFor="booking-time" className="text-sm font-semibold text-slate-700">Khung giờ *</label><select id="booking-time" value={form.preferredTimeSlot} onChange={(event) => set('preferredTimeSlot', event.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10"><option value="">Chọn khung giờ</option>{TIME_SLOTS.map((slot) => <option key={slot} value={slot}>{slot}</option>)}</select></div></div>
+                <div><label htmlFor="booking-access-note" className="text-sm font-semibold text-slate-700">Ghi chú tiếp cận</label><textarea id="booking-access-note" maxLength={500} value={form.accessNote} onChange={(event) => set('accessNote', event.target.value)} rows={3} placeholder="Ví dụ: gọi trước 30 phút, ngõ nhỏ, có chỗ gửi xe..." className="mt-1.5 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10" /></div>
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-6 text-amber-950"><Clock3 aria-hidden="true" className="mr-2 inline h-4 w-4" />Đây là yêu cầu lịch, chưa phải lịch hẹn đã xác nhận. Chúng tôi sẽ phản hồi và gửi thông báo khi kỹ thuật viên được điều phối.</div>
               </div>
             )}
@@ -319,20 +433,27 @@ export default function ServiceBooking() {
             {step === 4 && (
               <div className="space-y-6">
                 <div><p className="text-xs font-black uppercase tracking-[0.16em] text-primary-700">Bước 4</p><h2 id="booking-step-4" className="mt-2 text-2xl font-black text-slate-950">Ảnh, ghi chú và xác nhận</h2><p className="mt-2 text-sm text-slate-600">Ảnh là tùy chọn. Sau khi gửi, bạn nhận mã tra cứu duy nhất và email xác nhận.</p></div>
-                <label className="group flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 text-center transition motion-reduce:transition-none hover:border-primary-400 hover:bg-primary-50"><UploadCloud aria-hidden="true" className="h-8 w-8 text-primary-600" /><strong className="mt-3 text-sm text-slate-900">Chọn ảnh hiện trạng</strong><span className="mt-1 text-xs text-slate-600">JPG, PNG, WebP · tối đa 5 ảnh, mỗi ảnh 5 MB</span><input className="sr-only" type="file" accept="image/*" multiple onChange={(event) => handleFiles(event.target.files)} /></label>
+                <label className="group flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 text-center transition motion-reduce:transition-none hover:border-primary-400 hover:bg-primary-50"><UploadCloud aria-hidden="true" className="h-8 w-8 text-primary-600" /><strong className="mt-3 text-sm text-slate-900">Chọn ảnh hiện trạng</strong><span className="mt-1 text-xs text-slate-600">JPG, PNG, WebP · tối đa 5 ảnh, mỗi ảnh 5 MB · kiểm tra chữ ký tệp</span><input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => void handleFiles(event.target.files)} /></label>
                 {previews.length > 0 && <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">{previews.map((preview, index) => <div key={`${preview.file.name}-${index}`} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"><img src={preview.url} alt={`Ảnh hiện trạng ${index + 1}`} width="240" height="240" className="aspect-square w-full object-cover" /><button type="button" aria-label={`Xóa ảnh ${index + 1}`} onClick={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))} className="absolute right-1.5 top-1.5 rounded-full bg-slate-950/80 p-2 text-white"><X aria-hidden="true" className="h-3.5 w-3.5" /></button></div>)}</div>}
-                <div><label htmlFor="booking-note" className="text-sm font-semibold text-slate-700">Ghi chú thêm</label><textarea id="booking-note" value={form.note} onChange={(event) => set('note', event.target.value)} rows={3} placeholder="Ví dụ: Gọi trước 30 phút, có chỗ gửi xe..." className="mt-1.5 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10" /></div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div><label htmlFor="booking-photo-note" className="text-sm font-semibold text-slate-700">Ghi chú cho ảnh</label><textarea id="booking-photo-note" maxLength={500} value={form.photoNote} onChange={(event) => set('photoNote', event.target.value)} rows={3} placeholder="Ảnh nào thể hiện lỗi, thời điểm chụp..." className="mt-1.5 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10" /></div>
+                  <div><label htmlFor="booking-note" className="text-sm font-semibold text-slate-700">Ghi chú chung</label><textarea id="booking-note" maxLength={2000} value={form.note} onChange={(event) => set('note', event.target.value)} rows={3} placeholder="Thông tin bổ sung cho điều phối viên..." className="mt-1.5 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/10" /></div>
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2">{[
                   ['Khách hàng', form.customerName],
                   ['Liên hệ', `${form.customerPhone} · ${form.customerEmail}`],
                   ['Dịch vụ', selectedCategory?.name || form.serviceCategoryId],
-                  ['Thiết bị', form.applianceType],
-                  ['Khu vực', form.district],
+                  ['Thiết bị', [form.applianceType, form.applianceBrand, form.applianceModel].filter(Boolean).join(' · ')],
+                  ['Khu vực', [form.ward, form.district, form.province].filter(Boolean).join(', ')],
                   ['Lịch mong muốn', `${form.preferredDate} · ${form.preferredTimeSlot}`],
                   ['Ưu tiên', PRIORITIES.find((item) => item.value === form.priority)?.label],
                   ['Hình ảnh', files.length ? `${files.length} ảnh` : 'Không có'],
                 ].map(([label, value]) => <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><span className="text-[10px] font-black uppercase tracking-wider text-slate-600">{label}</span><strong className="mt-1 block text-sm leading-6 text-slate-900">{value}</strong></div>)}</div>
                 <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5"><div className="flex flex-wrap items-end justify-between gap-3"><div><span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">Giá tham khảo</span><strong className="mt-1 block text-lg text-emerald-950">{selectedCategory?.referencePriceMin ? `${formatCurrency(selectedCategory.referencePriceMin)} – ${formatCurrency(selectedCategory.referencePriceMax)}` : 'Sẽ báo sau khảo sát'}</strong></div><div className="text-right text-xs text-emerald-900"><span className="block">Phí khảo sát tham khảo</span><strong>{formatCurrency(selectedCategory?.surveyFee)}</strong></div></div><p className="mt-3 text-xs leading-6 text-emerald-950">{selectedCategory?.pricingNote || 'Giá trên không phải giá chốt tự động. Kỹ thuật viên kiểm tra, lập báo giá và chỉ thực hiện sau khi bạn đồng ý.'}</p><label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-white/70 p-3 text-xs font-bold leading-5 text-slate-800"><input type="checkbox" checked={pricingAccepted} onChange={(event) => setPricingAccepted(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500" /><span>Tôi hiểu đây là khoảng giá tham khảo; báo giá chính thức và phí khảo sát (nếu có) phải được thông báo trước.</span></label></div>
+                <div className="grid gap-3">
+                  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-4 text-xs font-bold leading-5 text-slate-800"><input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500" /><span>Tôi đồng ý <Link to="/policy/booking" className="text-primary-700 underline">chính sách đặt lịch</Link> và <Link to="/policy/terms" className="text-primary-700 underline">điều khoản website</Link> phiên bản DL247-SVC-1.0.</span></label>
+                  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-4 text-xs font-bold leading-5 text-slate-800"><input type="checkbox" checked={dataProcessingConsent} onChange={(event) => setDataProcessingConsent(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500" /><span>Tôi đồng ý xử lý thông tin và ảnh theo <Link to="/policy/privacy" className="text-primary-700 underline">chính sách bảo mật</Link> để chẩn đoán, điều phối và lưu hồ sơ dịch vụ.</span></label>
+                </div>
                 <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-xs leading-6 text-blue-900"><ShieldCheck aria-hidden="true" className="mr-2 inline h-4 w-4" />Thông tin liên hệ sẽ không hiển thị đầy đủ trên trang tra cứu. Kỹ thuật viên chỉ nhận thông tin cần thiết sau khi được phân công.</div>
               </div>
             )}

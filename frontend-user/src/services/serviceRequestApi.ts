@@ -6,14 +6,25 @@ export interface CreateServiceRequestPayload {
   customerPhone: string;
   customerEmail: string;
   customerAddress: string;
+  province: string;
   district: string;
+  ward: string;
   applianceType: string;
+  applianceBrand?: string;
+  applianceModel?: string;
   serviceCategoryId: string;
   issueDescription: string;
   priority: ServiceRequestPriority;
   preferredDate: string;
   preferredTimeSlot: string;
   note?: string;
+  accessNote?: string;
+  photoNote?: string;
+  contactConsent: true;
+  dataProcessingConsent: true;
+  termsAccepted: true;
+  termsVersion: 'DL247-SVC-1.0';
+  companyWebsite?: string;
   pricingDisclosureAccepted: true;
   pricingDisclosureVersion: '2026-07-v1';
 }

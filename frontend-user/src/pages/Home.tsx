@@ -1,16 +1,20 @@
 import {
   ArrowRight,
-  Award,
   Building2,
   CalendarCheck,
   CheckCircle2,
+  ClipboardCheck,
   Clock3,
+  Drill,
+  Droplets,
   Headphones,
   MapPin,
   Phone,
+  ScanSearch,
   ShieldCheck,
   Sparkles,
   Users,
+  Wind,
   Wrench,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -18,10 +22,11 @@ import OptimizedImage from '@/components/common/OptimizedImage';
 import QuickContactForm from '@/components/contact/QuickContactForm';
 import CmsManagedHomepage from '@/components/cms/CmsManagedHomepage';
 import PricingTable from '@/components/home/PricingTable';
-import { articles, processSteps, projects, reasons, services, testimonials } from '@/data/phase4Content';
+import { articles, processSteps, reasons } from '@/data/phase4Content';
 import { serviceFaq } from '@/data/servicePolicies';
 import useDocumentTitle from '@/hooks/useDocumentTitle';
 import { useSettings } from '@/hooks/useSettings';
+import { DISTRICT_OPTIONS } from '@/constants/areas';
 
 interface SectionHeaderProps {
   eyebrow: string;
@@ -64,6 +69,44 @@ const servicePromises = [
   { icon: Headphones, title: 'Hỗ trợ sau dịch vụ', text: 'Tiếp nhận bảo hành và phản hồi' },
 ];
 
+const featuredServices = [
+  {
+    id: 'sua-dieu-hoa',
+    icon: Wind,
+    title: 'Sửa chữa',
+    description: 'Chẩn đoán điều hòa, tủ lạnh, máy giặt và thiết bị điện lạnh có dấu hiệu bất thường.',
+    price: 'Từ 250.000đ',
+  },
+  {
+    id: 've-sinh-dieu-hoa',
+    icon: Droplets,
+    title: 'Vệ sinh',
+    description: 'Làm sạch chuyên sâu, kiểm tra thoát nước và đánh giá hiệu suất vận hành.',
+    price: 'Từ 150.000đ',
+  },
+  {
+    id: 'lap-dat-dieu-hoa',
+    icon: Drill,
+    title: 'Lắp đặt',
+    description: 'Khảo sát vị trí, vật tư, đường điện và chạy thử trước khi bàn giao.',
+    price: 'Báo giá sau khảo sát',
+  },
+  {
+    id: 'bao-tri-dinh-ky',
+    icon: ClipboardCheck,
+    title: 'Bảo trì',
+    description: 'Lập lịch định kỳ, checklist thiết bị và hồ sơ nghiệm thu cho gia đình hoặc doanh nghiệp.',
+    price: 'Theo quy mô hệ thống',
+  },
+  {
+    id: 'kiem-tra-chan-doan',
+    icon: ScanSearch,
+    title: 'Kiểm tra',
+    description: 'Đo kiểm và xác định nguyên nhân trước khi đề xuất phương án, chi phí hoặc linh kiện.',
+    price: 'Phí khảo sát công khai',
+  },
+] as const;
+
 export default function Home() {
   useDocumentTitle(
     'Điện Lạnh 247 - Sửa chữa, bảo trì và lắp đặt điện lạnh',
@@ -97,7 +140,7 @@ export default function Home() {
               </span>
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-8 text-slate-300 sm:text-lg">
-              Điện Lạnh 247 tiếp nhận sửa chữa, vệ sinh, lắp đặt và bảo trì cho gia đình và doanh nghiệp. Mỗi yêu cầu đều được xác nhận lịch, báo giá và theo dõi bảo hành.
+              Tiếp nhận sửa chữa, vệ sinh, lắp đặt, bảo trì và kiểm tra tại Hà Nội. Mỗi yêu cầu có mã tra cứu, được xác nhận lịch và chỉ triển khai sau khi khách hàng đồng ý báo giá.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
@@ -115,10 +158,10 @@ export default function Home() {
             </div>
             <dl className="mt-10 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
               {[
-                ['30–60 phút', 'Thời gian dự kiến'],
-                ['3–12 tháng', 'Bảo hành dịch vụ'],
+                ['Hà Nội', 'Khu vực phục vụ'],
+                ['Mã riêng', 'Theo dõi yêu cầu'],
                 ['Báo giá trước', 'Không tự ý sửa'],
-                ['Mỗi ngày', 'Tiếp nhận yêu cầu'],
+                ['8:00–21:00', 'Tiếp nhận mỗi ngày'],
               ].map(([value, label]) => (
                 <div key={label} className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
                   <dt className="text-xs leading-5 text-slate-300">{label}</dt>
@@ -166,34 +209,27 @@ export default function Home() {
               Xem toàn bộ dịch vụ <ArrowRight aria-hidden="true" className="h-4 w-4" />
             </Link>
           </div>
-          <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {services.slice(0, 3).map((service) => (
-              <article key={service.slug} className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl motion-reduce:transform-none">
-                <div className="relative aspect-[16/10] overflow-hidden">
-                  <OptimizedImage
-                    src={service.image}
-                    alt={service.title}
-                    assetKey="service.card"
-                    width={720}
-                    height={450}
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04] motion-reduce:transform-none"
-                  />
-                  <span className="absolute left-4 top-4 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-slate-800 shadow-sm">
-                    {service.priceLabel}
-                  </span>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-lg font-black text-slate-950">{service.title}</h3>
-                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{service.description}</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">{service.responseTime}</span>
-                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">{service.warranty}</span>
-                  </div>
-                  <Link to={`/service-booking?service=${encodeURIComponent(service.slug)}`} className="mt-5 inline-flex items-center gap-2 text-sm font-black text-primary-700">
-                    Đặt dịch vụ <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                  </Link>
-                </div>
+          <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            {featuredServices.map((service, index) => (
+              <article
+                key={service.id}
+                className={`group relative overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl motion-reduce:transform-none ${
+                  index === 0 ? 'md:col-span-2 lg:col-span-1' : ''
+                }`}
+              >
+                <span aria-hidden="true" className="absolute right-4 top-2 text-5xl font-black text-slate-50">0{index + 1}</span>
+                <span className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-700 to-cyan-500 text-white shadow-lg shadow-blue-500/15">
+                  <service.icon aria-hidden="true" className="h-5 w-5" />
+                </span>
+                <h3 className="relative mt-5 text-lg font-black text-slate-950">{service.title}</h3>
+                <p className="relative mt-3 min-h-24 text-sm leading-6 text-slate-600">{service.description}</p>
+                <p className="relative mt-4 text-xs font-black text-emerald-700">{service.price}</p>
+                <Link
+                  to={`/service-booking?service=${encodeURIComponent(service.id)}`}
+                  className="relative mt-5 inline-flex items-center gap-2 text-sm font-black text-primary-700"
+                >
+                  Gửi yêu cầu <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                </Link>
               </article>
             ))}
           </div>
@@ -207,7 +243,7 @@ export default function Home() {
           <div className="relative pb-6">
             <div className="overflow-hidden rounded-[2rem] bg-slate-100 shadow-2xl">
               <OptimizedImage
-                assetKey="about.team"
+                assetKey="service.diagnostic-team"
                 sizes="(max-width: 1024px) 100vw, 50vw"
                 className="aspect-[4/3] h-full w-full object-cover"
               />
@@ -215,9 +251,9 @@ export default function Home() {
             <div className="absolute bottom-0 right-4 rounded-2xl border border-white/70 bg-white/95 p-5 shadow-xl">
               <div className="flex items-center gap-3">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-700">
-                  <Award aria-hidden="true" className="h-5 w-5" />
+                  <ScanSearch aria-hidden="true" className="h-5 w-5" />
                 </span>
-                <div><strong className="block text-lg font-black text-slate-950">10+ năm</strong><span className="text-xs text-slate-600">kinh nghiệm vận hành</span></div>
+                <div><strong className="block text-sm font-black text-slate-950">Chẩn đoán trước</strong><span className="text-xs text-slate-600">Báo giá rồi mới thực hiện</span></div>
               </div>
             </div>
           </div>
@@ -237,44 +273,6 @@ export default function Home() {
             <Link to="/about" className="mt-8 inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-950 px-5 text-sm font-black text-white">
               Tìm hiểu về chúng tôi <ArrowRight aria-hidden="true" className="h-4 w-4" />
             </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-[#061527] py-20 text-white sm:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-            <SectionHeader
-              tone="dark"
-              eyebrow="Dự án tiêu biểu"
-              title="Kinh nghiệm từ nhiều loại không gian"
-              description="Từ căn hộ đến văn phòng và chuỗi dịch vụ, giải pháp được thiết kế theo điều kiện vận hành thực tế."
-            />
-            <Link to="/projects" className="inline-flex items-center gap-2 text-sm font-black text-cyan-300">
-              Xem tất cả dự án <ArrowRight aria-hidden="true" className="h-4 w-4" />
-            </Link>
-          </div>
-          <div className="mt-10 grid gap-6 lg:grid-cols-2">
-            {projects.slice(0, 2).map((project) => (
-              <Link key={project.slug} to={`/projects/${project.slug}`} className="group relative min-h-[340px] overflow-hidden rounded-[2rem] border border-white/10 bg-slate-900">
-                <OptimizedImage
-                  src={project.image}
-                  alt={project.title}
-                  assetKey="project.cover"
-                  width={900}
-                  height={620}
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  className="absolute inset-0 h-full w-full object-cover opacity-65 transition duration-500 group-hover:scale-105 motion-reduce:transform-none"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/45 to-transparent" />
-                <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
-                  <div className="flex flex-wrap gap-2 text-xs font-bold text-cyan-200"><span>{project.category}</span><span>•</span><span>{project.location}</span></div>
-                  <h3 className="mt-3 text-xl font-black sm:text-2xl">{project.title}</h3>
-                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-300">{project.summary}</p>
-                  <span className="mt-5 inline-flex items-center gap-2 text-sm font-black">Xem hồ sơ dự án <ArrowRight aria-hidden="true" className="h-4 w-4" /></span>
-                </div>
-              </Link>
-            ))}
           </div>
         </div>
       </section>
@@ -321,7 +319,32 @@ export default function Home() {
         </div>
       </section>
 
-      <CmsManagedHomepage fallbackTestimonials={testimonials} />
+      <section className="bg-[#061527] py-20 text-white sm:py-24" aria-labelledby="service-area-title">
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300">Khu vực và thời gian</p>
+            <h2 id="service-area-title" className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Biết trước nơi phục vụ và cách xác nhận lịch</h2>
+            <p className="mt-5 text-sm leading-7 text-slate-300 sm:text-base">
+              Hệ thống tiếp nhận yêu cầu mỗi ngày từ 8:00 đến 21:00 theo múi giờ Việt Nam. Khung giờ khách chọn là thời gian mong muốn; điều phối viên sẽ xác nhận lại trước khi kỹ thuật viên di chuyển.
+            </p>
+            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><strong className="block text-sm">Tiếp nhận trực tuyến</strong><span className="mt-1 block text-xs text-slate-400">24/7, phản hồi trong giờ làm việc</span></div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><strong className="block text-sm">Lịch được xác nhận</strong><span className="mt-1 block text-xs text-slate-400">Qua điện thoại, email hoặc Customer Hub</span></div>
+            </div>
+          </div>
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 backdrop-blur-sm sm:p-8">
+            <div className="flex items-center gap-3"><MapPin aria-hidden="true" className="h-5 w-5 text-cyan-300" /><h3 className="font-black">Khu vực đang hỗ trợ tại Hà Nội</h3></div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {DISTRICT_OPTIONS.map((area) => (
+                <span key={area.value} className="rounded-full border border-white/10 bg-slate-950/30 px-3 py-2 text-xs font-bold text-slate-200">{area.label}</span>
+              ))}
+            </div>
+            <p className="mt-5 text-xs leading-6 text-slate-400">Địa chỉ ngoài danh sách sẽ được kiểm tra khả năng điều phối trước khi xác nhận. Website không tự động cam kết thời gian có mặt.</p>
+          </div>
+        </div>
+      </section>
+
+      <CmsManagedHomepage />
 
       <section className="bg-slate-50 py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

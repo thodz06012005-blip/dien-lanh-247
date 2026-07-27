@@ -76,14 +76,16 @@ test('content editor supports rich content, media, SEO and publish settings', ()
   assert.match(media, /Alt text/);
 });
 
-test('public site consumes CMS bundles with stable fallback content', () => {
+test('public site consumes CMS bundles and hides unverified social proof', () => {
   const api = read('frontend-user/src/services/contentApi.ts');
   const home = read('frontend-user/src/pages/Home.tsx');
   const managed = read('frontend-user/src/components/cms/CmsManagedHomepage.tsx');
   const footer = read('frontend-user/src/components/layout/Footer.tsx');
   assert.match(api, /getSiteContent/);
   assert.match(home, /CmsManagedHomepage/);
-  assert.match(managed, /fallbackTestimonials/);
+  assert.doesNotMatch(managed, /fallbackTestimonials/);
+  assert.match(managed, /testimonials\.length > 0/);
+  assert.match(managed, /projects\.length > 0/);
   assert.match(managed, /bundle\?\.partners/);
   assert.match(footer, /FOOTER_MAIN/);
   assert.match(footer, /fallbackServiceLinks/);

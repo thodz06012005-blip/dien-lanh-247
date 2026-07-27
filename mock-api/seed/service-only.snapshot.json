@@ -73,6 +73,17 @@
       "slug": "bao-tri-dinh-ky",
       "icon": "Wrench",
       "description": "Gói bảo trì định kỳ cho các thiết bị điện lạnh"
+    },
+    {
+      "id": "kiem-tra-chan-doan",
+      "name": "Kiểm tra và chẩn đoán",
+      "slug": "kiem-tra-chan-doan",
+      "icon": "ScanSearch",
+      "description": "Đo kiểm, xác định nguyên nhân và đề xuất phương án trước khi sửa chữa",
+      "referencePriceMin": null,
+      "referencePriceMax": null,
+      "surveyFee": 100000,
+      "pricingNote": "Phí khảo sát và phạm vi đo kiểm phải được xác nhận trước; chưa bao gồm sửa chữa hoặc vật tư."
     }
   ],
   "serviceRequests": [

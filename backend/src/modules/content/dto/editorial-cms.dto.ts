@@ -49,6 +49,10 @@ export class EditorialPayloadDto {
   @IsOptional() @IsString() quote?: string;
   @IsOptional() @IsString() bio?: string;
   @IsOptional() @IsString() result?: string;
+  @IsOptional() @IsString() @MaxLength(500) evidenceReference?: string;
+  @IsOptional() @Transform(asBoolean) @IsBoolean() imageRightsConfirmed?: boolean;
+  @IsOptional() @Transform(asBoolean) @IsBoolean() isVerified?: boolean;
+  @IsOptional() @IsString() @MaxLength(500) verificationReference?: string;
 
   @IsOptional() pricing?: unknown;
   @IsOptional() process?: unknown;

@@ -160,13 +160,19 @@ async function runTests() {
       customerName: 'Test customer',
       customerPhone: '0912345678',
       customerAddress: '123 Test St',
+      province: 'Hà Nội',
       district: 'Quận Cầu Giấy',
+      ward: 'Dịch Vọng',
       serviceCategoryId: 've-sinh-dieu-hoa',
       applianceType: 'Điều hòa',
       issueDescription: 'Bảo trì',
       preferredDate: '2026-07-20',
       preferredTimeSlot: '10:00 - 12:00',
       priority: 'invalid-priority',
+      contactConsent: true,
+      dataProcessingConsent: true,
+      termsAccepted: true,
+      termsVersion: 'DL247-SVC-1.0',
       pricingDisclosureAccepted: true,
       pricingDisclosureVersion: '2026-07-v1',
     },
@@ -187,12 +193,18 @@ async function runTests() {
     customerName: 'Customer District Test',
     customerPhone: '0912345678',
     customerAddress: '123 Test St',
+    province: 'Hà Nội',
     district: 'Quận Cầu Giấy',
+    ward: 'Dịch Vọng',
     serviceCategoryId: 've-sinh-dieu-hoa',
     applianceType: 'Điều hòa',
     issueDescription: 'Bảo trì',
     preferredDate: preferredDate.toISOString().slice(0, 10),
     preferredTimeSlot: '10:00 - 12:00',
+    contactConsent: true,
+    dataProcessingConsent: true,
+    termsAccepted: true,
+    termsVersion: 'DL247-SVC-1.0',
     pricingDisclosureAccepted: true,
     pricingDisclosureVersion: '2026-07-v1',
   });
@@ -203,6 +215,85 @@ async function runTests() {
   console.log('Status:', srRes.status, 'Saved district:', savedRequest?.data?.data?.district);
   if (srRes.status !== 201 || savedRequest?.data?.data?.district !== 'Quận Cầu Giấy') {
     console.error('ERROR: Failed to save district correctly!');
+    process.exit(1);
+  }
+  console.log('PASS.');
+
+  console.log('\n[Test 10] Rejecting a request outside the supported province...');
+  const unsupportedArea = await request('POST', '/api/v1/service-requests', {
+    customerName: 'Customer Area Test',
+    customerPhone: '0912345678',
+    customerAddress: '123 Test St',
+    province: 'Thành phố Hồ Chí Minh',
+    district: 'Quận 1',
+    ward: 'Bến Nghé',
+    serviceCategoryId: 've-sinh-dieu-hoa',
+    applianceType: 'Điều hòa',
+    issueDescription: 'Máy cần được vệ sinh định kỳ.',
+    preferredDate: preferredDate.toISOString().slice(0, 10),
+    preferredTimeSlot: '10:00 - 12:00',
+    contactConsent: true,
+    dataProcessingConsent: true,
+    termsAccepted: true,
+    termsVersion: 'DL247-SVC-1.0',
+    pricingDisclosureAccepted: true,
+    pricingDisclosureVersion: '2026-07-v1',
+  });
+  if (unsupportedArea.status !== 400) {
+    console.error('ERROR: API accepted an unsupported service province!');
+    process.exit(1);
+  }
+  console.log('PASS.');
+
+  console.log('\n[Test 11] Rejecting a submission without required consent...');
+  const missingConsent = await request('POST', '/api/v1/service-requests', {
+    customerName: 'Customer Consent Test',
+    customerPhone: '0912345678',
+    customerAddress: '123 Test St',
+    province: 'Hà Nội',
+    district: 'Quận Cầu Giấy',
+    ward: 'Dịch Vọng',
+    serviceCategoryId: 've-sinh-dieu-hoa',
+    applianceType: 'Điều hòa',
+    issueDescription: 'Máy cần được vệ sinh định kỳ.',
+    preferredDate: preferredDate.toISOString().slice(0, 10),
+    preferredTimeSlot: '10:00 - 12:00',
+    contactConsent: false,
+    dataProcessingConsent: true,
+    termsAccepted: true,
+    termsVersion: 'DL247-SVC-1.0',
+    pricingDisclosureAccepted: true,
+    pricingDisclosureVersion: '2026-07-v1',
+  });
+  if (missingConsent.status !== 400) {
+    console.error('ERROR: API accepted a request without required consent!');
+    process.exit(1);
+  }
+  console.log('PASS.');
+
+  console.log('\n[Test 12] Rejecting a honeypot submission...');
+  const spamSubmission = await request('POST', '/api/v1/service-requests', {
+    customerName: 'Customer Spam Test',
+    customerPhone: '0912345678',
+    customerAddress: '123 Test St',
+    province: 'Hà Nội',
+    district: 'Quận Cầu Giấy',
+    ward: 'Dịch Vọng',
+    serviceCategoryId: 've-sinh-dieu-hoa',
+    applianceType: 'Điều hòa',
+    issueDescription: 'Máy cần được vệ sinh định kỳ.',
+    preferredDate: preferredDate.toISOString().slice(0, 10),
+    preferredTimeSlot: '10:00 - 12:00',
+    contactConsent: true,
+    dataProcessingConsent: true,
+    termsAccepted: true,
+    termsVersion: 'DL247-SVC-1.0',
+    pricingDisclosureAccepted: true,
+    pricingDisclosureVersion: '2026-07-v1',
+    companyWebsite: 'https://spam.invalid',
+  });
+  if (spamSubmission.status !== 400) {
+    console.error('ERROR: API accepted a honeypot submission!');
     process.exit(1);
   }
   console.log('PASS.');

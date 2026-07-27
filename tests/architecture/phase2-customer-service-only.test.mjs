@@ -68,10 +68,13 @@ test('Account Hub has exactly six service-oriented tabs and no order query', () 
 
 test('home presents services, reference pricing, process and projects', () => {
   const home = source('frontend-user/src/pages/Home.tsx');
+  const cms = source('frontend-user/src/components/cms/CmsManagedHomepage.tsx');
   const pricing = source('frontend-user/src/components/home/PricingTable.tsx');
-  for (const marker of ['Dịch vụ nổi bật', '<PricingTable />', 'Quy trình phục vụ', 'Dự án tiêu biểu']) {
+  for (const marker of ['Dịch vụ nổi bật', '<PricingTable />', 'Quy trình phục vụ', '<CmsManagedHomepage />']) {
     assert.ok(home.includes(marker), marker);
   }
+  assert.match(cms, /Dự án tiêu biểu đã xác minh/);
+  assert.match(cms, /projects\.length > 0/);
   assert.match(pricing, /Bảng giá tham khảo/);
   assert.match(pricing, /báo giá chính xác trước khi sửa/);
   assert.doesNotMatch(pricing, /<Link[^>]*>\s*<button/);

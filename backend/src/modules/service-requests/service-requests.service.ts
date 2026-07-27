@@ -386,6 +386,9 @@ export class ServiceRequestsService {
     actor: ServiceRequestActor,
     idempotencyKey?: string,
   ) {
+    if (dto.companyWebsite?.trim()) {
+      throw new BadRequestException('Không thể tiếp nhận yêu cầu');
+    }
     const normalizedKey = idempotencyKey?.trim();
     if (
       normalizedKey &&
@@ -410,6 +413,11 @@ export class ServiceRequestsService {
     if (!category) {
       throw new BadRequestException(
         'Dịch vụ không tồn tại hoặc đã ngừng hoạt động',
+      );
+    }
+    if (dto.province.trim().toLocaleLowerCase('vi-VN') !== 'hà nội') {
+      throw new BadRequestException(
+        'Khu vực này chưa nằm trong phạm vi điều phối trực tuyến',
       );
     }
 
@@ -440,19 +448,28 @@ export class ServiceRequestsService {
             customerName: dto.customerName.trim(),
             customerPhone: phone,
             customerAddress: dto.customerAddress.trim(),
+            province: dto.province.trim(),
             district,
+            ward: dto.ward.trim(),
             serviceCategoryId: dto.serviceCategoryId,
             applianceType: dto.applianceType.trim(),
+            applianceBrand: dto.applianceBrand?.trim() || null,
+            applianceModel: dto.applianceModel?.trim() || null,
             issueDescription: dto.issueDescription.trim(),
             images: dto.images ?? [],
             preferredDate: dto.preferredDate,
             preferredTimeSlot: dto.preferredTimeSlot.trim(),
             note: dto.note?.trim() ?? '',
+            accessNote: dto.accessNote?.trim() || null,
+            photoNote: dto.photoNote?.trim() || null,
             status: ServiceRequestStatus.pending,
             priority: dto.priority ?? ServiceRequestPriority.medium,
             estimatedPrice: 0,
             finalPrice: 0,
             paymentStatus: 'unpaid',
+            contactConsentAt: new Date(),
+            dataProcessingConsentAt: new Date(),
+            termsAcceptedVersion: dto.termsVersion,
             statusHistory: [
               {
                 status: 'NEW',

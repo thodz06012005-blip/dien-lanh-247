@@ -306,10 +306,10 @@ export const reasons = [
 ];
 
 export const processSteps = [
-  { step: '01', title: 'Tiếp nhận', description: 'Ghi nhận thiết bị, tình trạng, địa chỉ và khung giờ mong muốn.' },
-  { step: '02', title: 'Tư vấn & xác nhận', description: 'Tư vấn sơ bộ, xác nhận lịch và điều phối kỹ thuật viên phù hợp.' },
-  { step: '03', title: 'Kiểm tra & báo giá', description: 'Đánh giá tại chỗ, giải thích nguyên nhân và gửi phương án chi phí.' },
-  { step: '04', title: 'Thực hiện', description: 'Thi công sau khi khách hàng đồng ý, tuân thủ an toàn và vệ sinh.' },
-  { step: '05', title: 'Nghiệm thu', description: 'Chạy thử, hướng dẫn sử dụng và ghi nhận thông tin bảo hành.' },
-  { step: '06', title: 'Chăm sóc sau dịch vụ', description: 'Tiếp nhận bảo hành, nhắc lịch bảo trì và hỗ trợ khi cần.' },
+  { step: '01', title: 'Tiếp nhận', description: 'Ghi nhận thiết bị, tình trạng, địa chỉ và khung giờ khách hàng mong muốn.' },
+  { step: '02', title: 'Xác nhận yêu cầu', description: 'Kiểm tra khu vực phục vụ, thông tin liên hệ và thống nhất lại khung giờ.' },
+  { step: '03', title: 'Phân công', description: 'Điều phối kỹ thuật viên theo thiết bị, khu vực, lịch làm việc và mức độ ưu tiên.' },
+  { step: '04', title: 'Chẩn đoán & báo giá', description: 'Kiểm tra tại chỗ, giải thích nguyên nhân và chỉ triển khai khi khách hàng đồng ý.' },
+  { step: '05', title: 'Thực hiện', description: 'Thi công theo phương án đã xác nhận, tuân thủ an toàn và vệ sinh khu vực.' },
+  { step: '06', title: 'Nghiệm thu & bảo hành', description: 'Chạy thử, bàn giao kết quả, ghi nhận bảo hành và hỗ trợ sau dịch vụ.' },
 ];

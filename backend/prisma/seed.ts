@@ -59,6 +59,7 @@ async function main() {
     ['sua-tu-lanh', 'Sửa tủ lạnh', 'Snowflake'],
     ['sua-may-giat', 'Sửa máy giặt', 'WashingMachine'],
     ['bao-tri-dinh-ky', 'Bảo trì định kỳ', 'Wrench'],
+    ['kiem-tra-chan-doan', 'Kiểm tra và chẩn đoán', 'ScanSearch'],
   ] as const;
   for (const [id, name, icon] of serviceCategories) {
     await prisma.serviceCategory.upsert({
