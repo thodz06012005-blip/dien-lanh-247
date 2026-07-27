@@ -69,4 +69,6 @@ test('booking form preserves idempotency while enforcing final field and consent
   assert.match(booking, /VIETNAM_TIME_ZONE/);
   assert.match(migration, /ADD COLUMN `contactConsentAt`/);
   assert.match(migration, /ADD COLUMN `imageRightsConfirmed`/);
+  assert.match(migration, /INFORMATION_SCHEMA\.COLUMNS/);
+  assert.match(migration, /COUNT\(\*\) = 4/);
 });

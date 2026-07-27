@@ -21,12 +21,34 @@ ALTER TABLE `Testimonial`
   ADD COLUMN `verificationReference` VARCHAR(500) NULL;
 
 INSERT IGNORE INTO `ServiceCategory`
-  (`id`, `name`, `slug`, `icon`, `description`,
-   `referencePriceMin`, `referencePriceMax`, `surveyFee`, `pricingNote`,
-   `createdAt`, `updatedAt`)
+  (`id`, `name`, `slug`, `icon`, `description`, `createdAt`, `updatedAt`)
 VALUES
   ('kiem-tra-chan-doan', 'Kiểm tra và chẩn đoán', 'kiem-tra-chan-doan', 'ScanSearch',
    'Đo kiểm, xác định nguyên nhân và đề xuất phương án trước khi sửa chữa.',
-   NULL, NULL, 100000,
-   'Phí khảo sát và phạm vi đo kiểm phải được xác nhận trước; chưa bao gồm chi phí sửa chữa hoặc vật tư.',
    NOW(3), NOW(3));
+
+-- The legacy migration drill intentionally omits the earlier pricing-column
+-- migration. Apply pricing only when all four optional columns are present.
+SELECT IF(
+  COUNT(*) = 4,
+  'UPDATE `ServiceCategory`
+   SET `referencePriceMin` = NULL,
+       `referencePriceMax` = NULL,
+       `surveyFee` = 100000,
+       `pricingNote` = ''Phí khảo sát và phạm vi đo kiểm phải được xác nhận trước; chưa bao gồm chi phí sửa chữa hoặc vật tư.''
+   WHERE `id` = ''kiem-tra-chan-doan''',
+  'SELECT 1'
+) INTO @dl247_category_pricing_sql
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'ServiceCategory'
+  AND COLUMN_NAME IN (
+    'referencePriceMin',
+    'referencePriceMax',
+    'surveyFee',
+    'pricingNote'
+  );
+
+PREPARE dl247_category_pricing_statement FROM @dl247_category_pricing_sql;
+EXECUTE dl247_category_pricing_statement;
+DEALLOCATE PREPARE dl247_category_pricing_statement;
