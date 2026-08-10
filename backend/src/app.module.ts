@@ -1,37 +1,56 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { UsersModule } from './modules/users/users.module';
-import { AuthModule } from './modules/auth/auth.module';
+import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
+import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
+import { validateEnvironment } from './config/environment';
 import { PrismaModule } from './core/database/prisma.module';
-import { ProductsModule } from './modules/products/products.module';
-import { CategoriesModule } from './modules/categories/categories.module';
+import { CloudinaryModule } from './integrations/cloudinary/cloudinary.module';
+import { MailModule } from './integrations/mail/mail.module';
+import { VnpayModule } from './integrations/payment/vnpay/vnpay.module';
+import { AuditLogModule } from './modules/audit/audit-log.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { BrandsModule } from './modules/brands/brands.module';
 import { CartModule } from './modules/cart/cart.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { ContactModule } from './modules/contact/contact.module';
+import { ContentModule } from './modules/content/content.module';
+import { CustomersModule } from './modules/customers/customers.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { HealthModule } from './modules/health/health.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { OperationsModule } from './modules/operations/operations.module';
 import { OrdersModule } from './modules/orders/orders.module';
-import { CloudinaryModule } from './integrations/cloudinary/cloudinary.module';
-import { VnpayModule } from './integrations/payment/vnpay/vnpay.module';
-import { MailModule } from './integrations/mail/mail.module';
+import { ProductsModule } from './modules/products/products.module';
 import { ServiceCategoriesModule } from './modules/service-categories/service-categories.module';
-import { TechniciansModule } from './modules/technicians/technicians.module';
 import { ServiceRequestsModule } from './modules/service-requests/service-requests.module';
 import { SettingsModule } from './modules/settings/settings.module';
-import { ContactModule } from './modules/contact/contact.module';
-import { DashboardModule } from './modules/dashboard/dashboard.module';
-import { CustomersModule } from './modules/customers/customers.module';
-import { AuditLogModule } from './modules/audit/audit-log.module';
+import { TechniciansModule } from './modules/technicians/technicians.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 100,
-    }]),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      cache: true,
+      expandVariables: true,
+      validate: validateEnvironment,
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          ttl: config.get<number>('THROTTLE_TTL_MS', 60_000),
+          limit: config.get<number>('THROTTLE_LIMIT', 100),
+        },
+      ],
+    }),
     PrismaModule,
+    HealthModule,
     UsersModule,
     AuthModule,
     ProductsModule,
@@ -47,18 +66,19 @@ import { AuditLogModule } from './modules/audit/audit-log.module';
     ServiceRequestsModule,
     SettingsModule,
     ContactModule,
+    ContentModule,
     DashboardModule,
     CustomersModule,
+    OperationsModule,
+    NotificationsModule,
     AuditLogModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: RequestLoggingInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: ApiResponseInterceptor },
   ],
 })
 export class AppModule {}
-

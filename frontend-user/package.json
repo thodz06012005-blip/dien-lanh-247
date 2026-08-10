@@ -3,12 +3,22 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.0.0 <23",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0",
+    "sitemap:generate": "node scripts/generate-sitemap.mjs",
+    "robots:generate": "node scripts/generate-robots.mjs",
+    "prebuild": "npm run sitemap:generate && npm run robots:generate",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "lint:fix": "eslint . --fix",
+    "test:architecture": "node --test tests/*.test.mjs",
+    "check": "npm run lint && npm run typecheck && npm run test:architecture && npm run build",
+    "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
